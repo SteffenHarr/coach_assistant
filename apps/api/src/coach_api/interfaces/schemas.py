@@ -1,0 +1,174 @@
+"""Pydantic schemas for the HTTP API.
+
+All input is validated; sensitive fields (passwords, tokens) are excluded
+from response models by construction.
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from coach_api.domain.entities import SessionType
+
+
+# ---------- Auth ----------
+
+
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    email: EmailStr
+    role: str
+    is_active: bool
+    is_verified: bool
+
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=128)
+    role: str = "player"
+
+
+class UserUpdate(BaseModel):
+    password: str | None = Field(default=None, min_length=12, max_length=128)
+    role: str | None = None
+
+
+# ---------- Coach ----------
+
+
+class CoachConstraintsIn(BaseModel):
+    min_block_slots: int = Field(0, ge=0, le=48)
+    max_slots_per_day: int | None = Field(None, ge=0, le=48)
+    max_slots_per_week: int | None = Field(None, ge=0, le=336)
+    min_break_slots: int = Field(0, ge=0, le=48)
+
+
+class CoachIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    availability: list[int] = Field(default_factory=list)
+    constraints: CoachConstraintsIn = Field(default_factory=CoachConstraintsIn)
+    max_group_size: int = Field(4, ge=1, le=12)
+
+    @field_validator("availability")
+    @classmethod
+    def _check_avail(cls, v: list[int]) -> list[int]:
+        for s in v:
+            if not 0 <= s < 7 * 48:
+                raise ValueError("slot index out of range")
+        return sorted(set(v))
+
+
+class CoachOut(CoachIn):
+    id: UUID
+
+
+# ---------- Player ----------
+
+
+class PlayerPreferencesIn(BaseModel):
+    preferred_coach_ids: list[UUID] = Field(default_factory=list)
+    preferred_partner_ids: list[UUID] = Field(default_factory=list)
+    allowed_session_types: list[SessionType] = Field(
+        default_factory=lambda: list(SessionType)
+    )
+
+
+class PlayerIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    availability: list[int] = Field(default_factory=list)
+    preferences: PlayerPreferencesIn = Field(default_factory=PlayerPreferencesIn)
+    min_slots_per_week: int = Field(0, ge=0, le=48)
+    max_slots_per_week: int = Field(4, ge=0, le=48)
+
+
+class PlayerOut(PlayerIn):
+    id: UUID
+
+
+# ---------- Court ----------
+
+
+class CourtIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    availability: list[int] = Field(default_factory=list)
+    indoor: bool = False
+
+
+class CourtOut(CourtIn):
+    id: UUID
+
+
+# ---------- Season & Plan ----------
+
+
+class SeasonIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    valid_from: date
+    valid_to: date
+
+    @field_validator("valid_to")
+    @classmethod
+    def _range(cls, v: date, info) -> date:  # type: ignore[no-untyped-def]
+        if info.data.get("valid_from") and v <= info.data["valid_from"]:
+            raise ValueError("valid_to must be after valid_from")
+        return v
+
+
+class SeasonOut(SeasonIn):
+    id: UUID
+
+
+class TrainingSessionOut(BaseModel):
+    coach_id: UUID
+    court_id: UUID
+    player_ids: list[UUID]
+    slot_indices: list[int]
+    session_type: SessionType
+
+
+class PlanOut(BaseModel):
+    id: UUID
+    season_id: UUID
+    score: float
+    explanation: str
+    sessions: list[TrainingSessionOut]
+
+
+class GeneratePlanIn(BaseModel):
+    season_id: UUID
+    num_solutions: int = Field(3, ge=1, le=10)
+    time_limit_seconds: float = Field(30.0, ge=1.0, le=300.0)
+
+
+class WorkloadDeltaOut(BaseModel):
+    coach_slots: dict[UUID, int] = Field(default_factory=dict)
+    player_slots: dict[UUID, int] = Field(default_factory=dict)
+
+
+class PlanDiffOut(BaseModel):
+    added: list[TrainingSessionOut]
+    removed: list[TrainingSessionOut]
+    unchanged_count: int
+    workload: WorkloadDeltaOut
+    score_delta: float
+
+
+# ---------- Agent / Chat ----------
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(pattern=r"^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=8000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=8000)
+    history: list[ChatMessage] = Field(default_factory=list, max_length=40)
+
+
+class ChatResponse(BaseModel):
+    reply: str

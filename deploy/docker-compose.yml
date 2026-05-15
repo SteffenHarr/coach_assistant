@@ -1,0 +1,109 @@
+# Coach Assistant – Docker Compose
+#
+# This stack runs entirely with open-source software and requires no paid services.
+# In dev: Caddy serves both the SPA and proxies /api/* and /chat/* to the API.
+# In prod: set DOMAIN and TLS_EMAIL in .env to enable automatic Let's Encrypt TLS.
+
+name: coach-assistant
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+    # IMPORTANT: not exposed to the host. Only reachable inside the Docker network.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - redis_data:/data
+    networks: [internal]
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks: [internal]
+    # Pre-pull configured model on first start
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        /bin/ollama serve &
+        pid=$$!
+        sleep 5
+        /bin/ollama pull "${OLLAMA_MODEL}" || true
+        wait $$pid
+
+  api:
+    build:
+      context: ../apps/api
+    restart: unless-stopped
+    env_file: [../.env]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+      ollama: { condition: service_started }
+    networks: [internal]
+    # Run migrations then start uvicorn
+    command:
+      - /bin/sh
+      - -c
+      - "alembic upgrade head && uvicorn coach_api.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips=*"
+
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    restart: unless-stopped
+    env_file: [../.env]
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    networks: [internal]
+
+  web:
+    build:
+      context: ../apps/web
+    networks: [internal]
+    # Serves /srv/web via Caddy (configured by the proxy below)
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      TLS_EMAIL: ${TLS_EMAIL:-internal}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api, web]
+    networks: [internal]
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  db_data:
+  redis_data:
+  ollama_data:
+  caddy_data:
+  caddy_config:
