@@ -5,8 +5,28 @@ type Msg = { role: "user" | "assistant"; content: string };
 
 const STORAGE_KEY = "coach.chat.dock.open";
 const HISTORY_KEY = "coach.chat.history";
+const TOKEN_KEY = "access_token";
+
+function hasToken(): boolean {
+  return !!sessionStorage.getItem(TOKEN_KEY);
+}
 
 export function ChatDock() {
+  const [authed, setAuthed] = useState<boolean>(hasToken);
+
+  // Re-check auth state on tab focus, storage change, and every 2s while open.
+  useEffect(() => {
+    const refresh = () => setAuthed(hasToken());
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    const id = window.setInterval(refresh, 2000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+      window.clearInterval(id);
+    };
+  }, []);
+
   const [open, setOpen] = useState<boolean>(() => {
     return localStorage.getItem(STORAGE_KEY) === "1";
   });
@@ -43,9 +63,13 @@ export function ChatDock() {
       });
       setHistory([...next, { role: "assistant", content: r.reply }]);
     } catch (e) {
+      const msg = (e as Error).message;
+      const friendly = msg.startsWith("401")
+        ? "⚠️ Du bist nicht angemeldet. Bitte klicke oben rechts auf „Anmelden" und logge dich ein."
+        : `⚠️ Fehler: ${msg}`;
       setHistory([
         ...next,
-        { role: "assistant", content: `⚠️ Fehler: ${(e as Error).message}` },
+        { role: "assistant", content: friendly },
       ]);
     } finally {
       setBusy(false);
@@ -55,6 +79,9 @@ export function ChatDock() {
   function clearHistory() {
     if (confirm("Chat-Verlauf wirklich löschen?")) setHistory([]);
   }
+
+  // Hide the dock completely when the user is not logged in.
+  if (!authed) return null;
 
   return (
     <>

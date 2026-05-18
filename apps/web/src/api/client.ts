@@ -33,4 +33,6 @@ export async function login(email: string, password: string): Promise<void> {
   if (!res.ok) throw new Error("login failed");
   const json = await res.json();
   sessionStorage.setItem("access_token", json.access_token);
+  // Notify same-tab listeners (e.g. ChatDock) that auth state changed.
+  window.dispatchEvent(new StorageEvent("storage", { key: "access_token" }));
 }
