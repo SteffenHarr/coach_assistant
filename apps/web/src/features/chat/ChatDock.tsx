@@ -65,8 +65,8 @@ export function ChatDock() {
     } catch (e) {
       const msg = (e as Error).message;
       const friendly = msg.startsWith("401")
-        ? "⚠️ Du bist nicht angemeldet. Bitte klicke oben rechts auf „Anmelden" und logge dich ein."
-        : `⚠️ Fehler: ${msg}`;
+        ? "Du bist nicht angemeldet. Bitte klicke oben rechts auf 'Anmelden' und logge dich ein."
+        : "Fehler: " + msg;
       setHistory([
         ...next,
         { role: "assistant", content: friendly },
@@ -138,9 +138,9 @@ export function ChatDock() {
                 Beispiele:
               </p>
               <ul className="clean" style={{ fontSize: "var(--text-xs)" }}>
-                <li>• „Welche Trainer haben wir?"</li>
-                <li>• „Erstelle 3 Plan-Varianten für Saison Sommer 2026."</li>
-                <li>• „Wie funktioniert der Saisonwechsel?"</li>
+                <li>{'• "Welche Trainer haben wir?"'}</li>
+                <li>{'• "Erstelle 3 Plan-Varianten für Saison Sommer 2026."'}</li>
+                <li>{'• "Wie funktioniert der Saisonwechsel?"'}</li>
               </ul>
             </div>
           )}
