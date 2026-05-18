@@ -31,6 +31,9 @@ def create_app() -> FastAPI:
         docs_url="/docs" if not settings.is_production else None,
         redoc_url=None,
         openapi_url="/openapi.json" if not settings.is_production else None,
+        # We sit behind Caddy at /api/* — tell FastAPI so generated URLs
+        # (e.g. the Swagger UI's reference to openapi.json) include the prefix.
+        root_path="/api",
         lifespan=lifespan,
     )
 
