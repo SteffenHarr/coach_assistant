@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, NavLink, Link } from "react-router-dom";
 import { App } from "./App";
 import { ChatPanel } from "./features/chat/ChatPanel";
+import { ChatDock } from "./features/chat/ChatDock";
 import { PlansPage } from "./features/plan/PlansPage";
 import { PlanDetailPage } from "./features/plan/PlanDetailPage";
 import { PlanDiffView } from "./features/plan/PlanDiffView";
@@ -33,7 +34,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <NavLink to="/coaches" className={navLinkClass}>Trainer</NavLink>
             <NavLink to="/diff" className={navLinkClass}>Vergleich</NavLink>
             <NavLink to="/replan" className={navLinkClass}>Saisonwechsel</NavLink>
-            <NavLink to="/chat" className={navLinkClass}>Chat</NavLink>
             <span className="app-nav__spacer" />
             <NavLink to="/login" className={navLinkClass}>Anmelden</NavLink>
           </nav>
@@ -47,6 +47,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/chat" element={<App><ChatPanel /></App>} />
             <Route path="/login" element={<App><LoginPage /></App>} />
           </Routes>
+          <ChatDock />
         </div>
       </BrowserRouter>
     </QueryClientProvider>
