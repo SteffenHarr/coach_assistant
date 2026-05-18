@@ -141,8 +141,10 @@ Die App braucht ein paar Geheimnisse (Passwörter), die nur du kennen sollst.
 In der PowerShell im Repo-Ordner:
 
 ```powershell
-docker compose -f deploy/docker-compose.yml up -d --build
+docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
 ```
+
+> 💡 **Wichtig:** Das `--env-file .env` muss bei **allen** `docker compose`-Befehlen mit angegeben werden, weil die Compose-Datei in `deploy/` liegt, die `.env` aber im Hauptordner. Ohne diesen Parameter findet Docker die Konfiguration nicht.
 
 Das dauert beim **ersten** Mal 5–15 Minuten:
 - Container werden gebaut.
@@ -150,20 +152,21 @@ Das dauert beim **ersten** Mal 5–15 Minuten:
 
 Status prüfen:
 ```powershell
-docker compose -f deploy/docker-compose.yml ps
+docker compose --env-file .env -f deploy/docker-compose.yml ps
 ```
 
 Alles sollte als **`running` (oder `healthy`)** angezeigt werden.
 
-Erster Test: Browser öffnen → https://localhost
-- Der Browser warnt vor dem Zertifikat (das ist erstmal normal, weil noch kein echtes Zertifikat eingerichtet ist) → einmal akzeptieren.
+Erster Test: Browser öffnen → http://localhost
 - Du siehst die Coach-Assistant-Oberfläche. 🎉
+
+> 🔒 **Zum Thema HTTPS:** Lokal über `localhost` ist die Verbindung unverschlüsselt, aber das ist sicher — die Daten verlassen deinen Rechner gar nicht. Sobald du in [Schritt 7](#7-von-überall-erreichbar-machen-cloudflare-tunnel) den Cloudflare Tunnel einrichtest, bekommen alle externen Nutzer automatisch eine **echte, vollwertige HTTPS-Verbindung** mit gültigem Zertifikat — Cloudflare kümmert sich um die Verschlüsselung.
 
 ---
 
 ## 6. Admin-Account anlegen
 
-1. Im Browser: `https://localhost/api/docs` öffnen.
+1. Im Browser: `http://localhost/api/docs` öffnen.
 2. Den Abschnitt **`auth → POST /auth/register`** suchen, auf „Try it out" klicken.
 3. Daten eingeben:
    ```json
@@ -175,13 +178,13 @@ Erster Test: Browser öffnen → https://localhost
 4. „Execute" klicken. Antwort sollte `200 OK` zeigen.
 5. **Den User zum Admin machen:** zurück in die PowerShell:
    ```powershell
-   docker compose -f deploy/docker-compose.yml exec db `
+   docker compose --env-file .env -f deploy/docker-compose.yml exec db `
      psql -U coach -d coach_assistant `
      -c "UPDATE users SET is_superuser=true, is_verified=true, role='admin' WHERE email='admin@dein-verein.de';"
    ```
    (E-Mail im Befehl anpassen.)
 
-6. Im Browser auf https://localhost öffnen → „Anmelden" → mit den Daten einloggen.
+6. Im Browser auf http://localhost öffnen → „Anmelden" → mit den Daten einloggen.
 
 ---
 
@@ -251,7 +254,7 @@ CLOUDFLARE_TUNNEL_TOKEN=<den Token hier einfügen>
 
 Anwenden:
 ```powershell
-docker compose -f deploy/docker-compose.yml up -d
+docker compose --env-file .env -f deploy/docker-compose.yml up -d
 ```
 
 #### A.4 Domain mit der App verbinden
@@ -298,13 +301,13 @@ Am Ende der Datei (vor `volumes:`) folgenden Block einfügen:
 Anwenden:
 
 ```powershell
-docker compose -f deploy/docker-compose.yml up -d
+docker compose --env-file .env -f deploy/docker-compose.yml up -d
 ```
 
 #### B.2 Adresse herausfinden
 
 ```powershell
-docker compose -f deploy/docker-compose.yml logs cloudflared
+docker compose --env-file .env -f deploy/docker-compose.yml logs cloudflared
 ```
 
 In der Ausgabe siehst du eine Zeile wie:
@@ -342,16 +345,16 @@ Diese Adresse ist deine App-URL. Browser öffnen → fertig. Alle, die den Link 
 
 ## 9. Tägliche Bedienung & Wartung
 
-Alle Befehle in PowerShell, im Repo-Ordner.
+Alle Befehle in PowerShell, im Repo-Ordner. **Wichtig:** Immer `--env-file .env` mit angeben.
 
 | Aktion | Befehl |
 |---|---|
-| Status der Container ansehen | `docker compose -f deploy/docker-compose.yml ps` |
-| Logs in Echtzeit ansehen | `docker compose -f deploy/docker-compose.yml logs -f` |
-| Stoppen | `docker compose -f deploy/docker-compose.yml stop` |
-| Wieder starten | `docker compose -f deploy/docker-compose.yml start` |
-| Komplett neu starten | `docker compose -f deploy/docker-compose.yml restart` |
-| Auf neue Version updaten | `git pull; docker compose -f deploy/docker-compose.yml up -d --build` |
+| Status der Container ansehen | `docker compose --env-file .env -f deploy/docker-compose.yml ps` |
+| Logs in Echtzeit ansehen | `docker compose --env-file .env -f deploy/docker-compose.yml logs -f` |
+| Stoppen | `docker compose --env-file .env -f deploy/docker-compose.yml stop` |
+| Wieder starten | `docker compose --env-file .env -f deploy/docker-compose.yml start` |
+| Komplett neu starten | `docker compose --env-file .env -f deploy/docker-compose.yml restart` |
+| Auf neue Version updaten | `git pull; docker compose --env-file .env -f deploy/docker-compose.yml up -d --build` |
 
 ### Stromsparmodus deaktivieren
 
@@ -373,7 +376,8 @@ Tägliches Backup einrichten:
    ```powershell
    $date = Get-Date -Format 'yyyy-MM-dd'
    $out = "C:\Backups\coach\coach-$date.sql"
-   docker compose -f C:\Git_Repos\coach_assistant\deploy\docker-compose.yml `
+   docker compose --env-file C:\Git_Repos\coach_assistant\.env `
+     -f C:\Git_Repos\coach_assistant\deploy\docker-compose.yml `
      exec -T db pg_dump -U coach coach_assistant > $out
    # alte Backups (>30 Tage) löschen
    Get-ChildItem C:\Backups\coach\coach-*.sql |
@@ -391,7 +395,7 @@ Tägliches Backup einrichten:
 Im Notfall:
 ```powershell
 Get-Content C:\Backups\coach\coach-YYYY-MM-DD.sql | `
-  docker compose -f deploy/docker-compose.yml exec -T db psql -U coach coach_assistant
+  docker compose --env-file .env -f deploy/docker-compose.yml exec -T db psql -U coach coach_assistant
 ```
 
 ---
