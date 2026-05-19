@@ -25,10 +25,10 @@
 		-Server
 	}
 
-	# API — strip /api prefix when forwarding
+	# API — strip /api prefix when forwarding.
+	# The API sets its own CSP (relaxed for /docs), so we suppress Caddy's.
 	handle_path /api/* {
-		# Relax CSP for Swagger UI which loads JS/CSS from a CDN.
-		header Content-Security-Policy "default-src 'self'; img-src 'self' data: https://fastapi.tiangolo.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+		header -Content-Security-Policy
 		reverse_proxy api:8000
 	}
 

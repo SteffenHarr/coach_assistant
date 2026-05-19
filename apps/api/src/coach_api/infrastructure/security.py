@@ -26,12 +26,25 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-        response.headers.setdefault(
-            "Content-Security-Policy",
-            "default-src 'self'; img-src 'self' data:; "
-            "script-src 'self'; style-src 'self' 'unsafe-inline'; "
-            "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
-        )
+        # Swagger UI / ReDoc need to load JS+CSS from a CDN and inline scripts —
+        # relax CSP for those endpoints only.
+        path = request.url.path
+        is_docs = path in ("/docs", "/redoc") or path.startswith("/docs/") or path.startswith("/redoc/")
+        if is_docs:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "img-src 'self' data: https://fastapi.tiangolo.com; "
+                "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+            )
+        else:
+            response.headers.setdefault(
+                "Content-Security-Policy",
+                "default-src 'self'; img-src 'self' data:; "
+                "script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+            )
         if get_settings().is_production:
             response.headers.setdefault(
                 "Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload"
