@@ -9,30 +9,29 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
+from fastapi_users import schemas as fa_schemas
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 from coach_api.domain.entities import SessionType
 
 
 # ---------- Auth ----------
+#
+# These inherit from fastapi-users' base schemas so the framework's helper
+# methods (create_update_dict, etc.) are available. We override only what we
+# need (longer minimum password, optional role field).
 
 
-class UserRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    email: EmailStr
-    role: str
-    is_active: bool
-    is_verified: bool
+class UserRead(fa_schemas.BaseUser[UUID]):
+    role: str = "player"
 
 
-class UserCreate(BaseModel):
-    email: EmailStr
+class UserCreate(fa_schemas.BaseUserCreate):
     password: str = Field(min_length=12, max_length=128)
     role: str = "player"
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(fa_schemas.BaseUserUpdate):
     password: str | None = Field(default=None, min_length=12, max_length=128)
     role: str | None = None
 
