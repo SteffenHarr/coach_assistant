@@ -13,27 +13,27 @@
 {$DOMAIN} {
 	encode gzip zstd
 
-	# Security headers (defence-in-depth; the API also sets these)
+	# Global headers that are safe for both SPA and API responses.
 	header {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "geolocation=(), microphone=(), camera=()"
-		Content-Security-Policy "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
 		# Hide server info
 		-Server
 	}
 
 	# API — strip /api prefix when forwarding.
-	# The API sets its own CSP (relaxed for /docs), so we suppress Caddy's.
+	# The API sets its OWN Content-Security-Policy (strict for app endpoints,
+	# relaxed for Swagger UI at /docs). Caddy must NOT overwrite it.
 	handle_path /api/* {
-		header -Content-Security-Policy
 		reverse_proxy api:8000
 	}
 
-	# Static SPA — proxy to the web container which serves the built assets
+	# Static SPA — strict CSP only here.
 	handle {
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
 		reverse_proxy web:80
 	}
 
