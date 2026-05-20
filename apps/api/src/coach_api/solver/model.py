@@ -123,6 +123,8 @@ def _solve_once(
 
     for c_i, c in enumerate(coaches):
         for p_i, p in enumerate(players):
+            if not _coach_accepts_player(c, p):
+                continue
             for t in range(T):
                 if t not in c.availability or t not in p.availability:
                     continue
@@ -392,3 +394,23 @@ def _make_session(
         slot_indices=tuple(run),
         session_type=st,
     )
+
+
+def _coach_accepts_player(coach: Coach, player: Player) -> bool:
+    """Hard pre-filter: skip (coach, player) pairs that fail the coach's
+    declared player-acceptance window. Missing values mean unrestricted on
+    that side / unknown on the player's side (allowed)."""
+    k = coach.constraints
+    lk = player.level_lk
+    age = player.age
+    if lk is not None:
+        if k.accepts_lk_min is not None and lk < k.accepts_lk_min:
+            return False
+        if k.accepts_lk_max is not None and lk > k.accepts_lk_max:
+            return False
+    if age is not None:
+        if k.accepts_age_min is not None and age < k.accepts_age_min:
+            return False
+        if k.accepts_age_max is not None and age > k.accepts_age_max:
+            return False
+    return True

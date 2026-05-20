@@ -25,6 +25,11 @@ class CoachConstraints:
     max_slots_per_day: int | None = None
     max_slots_per_week: int | None = None
     min_break_slots: int = 0          # mind. Pause zwischen zwei Blöcken am selben Tag
+    # Player-matching constraints (None = unrestricted on that side).
+    accepts_lk_min: int | None = None     # smallest LK number = strongest player
+    accepts_lk_max: int | None = None     # largest LK number = weakest player
+    accepts_age_min: int | None = None
+    accepts_age_max: int | None = None
 
 
 @dataclass(slots=True)
@@ -53,6 +58,8 @@ class Player:
     preferences: PlayerPreferences = field(default_factory=PlayerPreferences)
     min_slots_per_week: int = 0
     max_slots_per_week: int = 4
+    age: int | None = None
+    level_lk: int | None = None        # German LK 1..25 (1=strongest)
 
 
 @dataclass(slots=True)

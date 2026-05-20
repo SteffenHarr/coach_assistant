@@ -38,6 +38,10 @@ def _coach_from_orm(o: CoachORM) -> Coach:
             max_slots_per_day=c.get("max_slots_per_day"),
             max_slots_per_week=c.get("max_slots_per_week"),
             min_break_slots=c.get("min_break_slots", 0),
+            accepts_lk_min=c.get("accepts_lk_min"),
+            accepts_lk_max=c.get("accepts_lk_max"),
+            accepts_age_min=c.get("accepts_age_min"),
+            accepts_age_max=c.get("accepts_age_max"),
         ),
         max_group_size=o.max_group_size,
     )
@@ -58,6 +62,8 @@ def _player_from_orm(o: PlayerORM) -> Player:
         ),
         min_slots_per_week=o.min_slots_per_week,
         max_slots_per_week=o.max_slots_per_week,
+        age=pref.get("age"),
+        level_lk=pref.get("level_lk"),
     )
 
 

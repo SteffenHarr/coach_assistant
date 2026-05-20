@@ -36,6 +36,33 @@ class UserUpdate(fa_schemas.BaseUserUpdate):
     role: str | None = None
 
 
+# ---------- Admin user management ----------
+
+
+class AdminUserCreate(BaseModel):
+    """Admin creates a user account on behalf of someone."""
+
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=128)
+    role: str = Field(default="player", pattern="^(admin|coach|player)$")
+
+
+class AdminUserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    email: EmailStr
+    role: str
+    is_active: bool
+    is_verified: bool
+    is_superuser: bool
+
+
+class AdminUserPatch(BaseModel):
+    role: str | None = Field(default=None, pattern="^(admin|coach|player)$")
+    is_active: bool | None = None
+    password: str | None = Field(default=None, min_length=12, max_length=128)
+
+
 # ---------- Coach ----------
 
 
@@ -44,6 +71,12 @@ class CoachConstraintsIn(BaseModel):
     max_slots_per_day: int | None = Field(None, ge=0, le=48)
     max_slots_per_week: int | None = Field(None, ge=0, le=336)
     min_break_slots: int = Field(0, ge=0, le=48)
+    # New (stored alongside in the same JSON column — solver currently ignores
+    # these, they are metadata for human matching).
+    accepts_lk_min: int | None = Field(None, ge=1, le=25)
+    accepts_lk_max: int | None = Field(None, ge=1, le=25)
+    accepts_age_min: int | None = Field(None, ge=3, le=120)
+    accepts_age_max: int | None = Field(None, ge=3, le=120)
 
 
 class CoachIn(BaseModel):
@@ -74,6 +107,11 @@ class PlayerPreferencesIn(BaseModel):
     allowed_session_types: list[SessionType] = Field(
         default_factory=lambda: list(SessionType)
     )
+    # New profile metadata (stored in the same JSON column — solver ignores).
+    age: int | None = Field(None, ge=3, le=120)
+    # Level on the German LK scale (1 = Profi, 25 = absolute Anfänger).
+    # Only writable by coaches/admins (enforced in the route handler).
+    level_lk: int | None = Field(None, ge=1, le=25)
 
 
 class PlayerIn(BaseModel):

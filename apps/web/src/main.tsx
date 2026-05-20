@@ -11,9 +11,14 @@ import { PlanDetailPage } from "./features/plan/PlanDetailPage";
 import { PlanDiffView } from "./features/plan/PlanDiffView";
 import { AvailabilityPage } from "./features/availability/AvailabilityPage";
 import { CoachEditorPage } from "./features/coach/CoachEditorPage";
+import { CoachProfilePage } from "./features/coach/CoachProfilePage";
+import { PlayerListPage } from "./features/player/PlayerListPage";
+import { PlayerProfilePage } from "./features/player/PlayerProfilePage";
 import { ReplanWizard } from "./features/replan/ReplanWizard";
 import { LoginPage } from "./features/auth/LoginPage";
-import { isLoggedIn, logout } from "./api/client";
+import { UsersAdminPage } from "./features/admin/UsersAdminPage";
+import { PlansLayout, CoachLayout, PlayerLayout } from "./features/nav/Layouts";
+import { isLoggedIn, logout, api } from "./api/client";
 import "./index.css";
 
 const qc = new QueryClient();
@@ -23,13 +28,25 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 function AuthNavLink() {
   const [authed, setAuthed] = useState<boolean>(isLoggedIn);
+  const [role, setRole] = useState<string | null>(null);
   const nav = useNavigate();
 
   useEffect(() => {
-    const refresh = () => setAuthed(isLoggedIn());
+    const refresh = () => {
+      const ok = isLoggedIn();
+      setAuthed(ok);
+      if (ok) {
+        api<{ role: string }>("/me")
+          .then((u) => setRole(u.role))
+          .catch(() => setRole(null));
+      } else {
+        setRole(null);
+      }
+    };
+    refresh();
     window.addEventListener("focus", refresh);
     window.addEventListener("storage", refresh);
-    const id = window.setInterval(refresh, 1000);
+    const id = window.setInterval(refresh, 5000);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("storage", refresh);
@@ -39,16 +56,31 @@ function AuthNavLink() {
 
   if (authed) {
     return (
-      <button
-        className="app-nav__link"
-        style={{ background: "transparent", border: "none", cursor: "pointer" }}
-        onClick={() => {
-          logout();
-          nav("/login");
-        }}
-      >
-        Abmelden
-      </button>
+      <>
+        {(role === "coach" || role === "admin") && (
+          <NavLink to="/trainer" className={navLinkClass}>
+            Trainer
+          </NavLink>
+        )}
+        <NavLink to="/spieler" className={navLinkClass}>
+          Spieler
+        </NavLink>
+        {role === "admin" && (
+          <NavLink to="/admin/users" className={navLinkClass}>
+            Benutzer
+          </NavLink>
+        )}
+        <button
+          className="app-nav__link"
+          style={{ background: "transparent", border: "none", cursor: "pointer" }}
+          onClick={() => {
+            logout();
+            nav("/login");
+          }}
+        >
+          Abmelden
+        </button>
+      </>
     );
   }
   return (
@@ -68,23 +100,33 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <span className="app-nav__brand-dot" aria-hidden />
               Coach Assistant
             </Link>
-            <NavLink to="/" end className={navLinkClass}>Pläne</NavLink>
-            <NavLink to="/availability" className={navLinkClass}>Verfügbarkeiten</NavLink>
-            <NavLink to="/coaches" className={navLinkClass}>Trainer</NavLink>
-            <NavLink to="/diff" className={navLinkClass}>Vergleich</NavLink>
-            <NavLink to="/replan" className={navLinkClass}>Saisonwechsel</NavLink>
+            <NavLink to="/plaene" className={navLinkClass}>Pläne</NavLink>
+            <NavLink to="/verfuegbarkeiten" className={navLinkClass}>Verfügbarkeiten</NavLink>
             <span className="app-nav__spacer" />
             <AuthNavLink />
           </nav>
           <Routes>
-            <Route path="/" element={<App><PlansPage /></App>} />
+            <Route path="/" element={<App><PlansLayout /></App>}>
+              <Route index element={<PlansPage />} />
+            </Route>
+            <Route path="/plaene" element={<App><PlansLayout /></App>}>
+              <Route index element={<PlansPage />} />
+              <Route path="vergleich" element={<PlanDiffView />} />
+              <Route path="saisonwechsel" element={<ReplanWizard />} />
+            </Route>
             <Route path="/plans/:planId" element={<App><PlanDetailPage /></App>} />
-            <Route path="/availability" element={<App><AvailabilityPage /></App>} />
-            <Route path="/coaches" element={<App><CoachEditorPage /></App>} />
-            <Route path="/diff" element={<App><PlanDiffView /></App>} />
-            <Route path="/replan" element={<App><ReplanWizard /></App>} />
+            <Route path="/verfuegbarkeiten" element={<App><AvailabilityPage /></App>} />
+            <Route path="/trainer" element={<App><CoachLayout /></App>}>
+              <Route index element={<CoachEditorPage />} />
+              <Route path="profil" element={<CoachProfilePage />} />
+            </Route>
+            <Route path="/spieler" element={<App><PlayerLayout /></App>}>
+              <Route index element={<PlayerListPage />} />
+              <Route path="profil" element={<PlayerProfilePage />} />
+            </Route>
             <Route path="/chat" element={<App><ChatPanel /></App>} />
             <Route path="/login" element={<App><LoginPage /></App>} />
+            <Route path="/admin/users" element={<App><UsersAdminPage /></App>} />
           </Routes>
           <ChatDock />
         </div>

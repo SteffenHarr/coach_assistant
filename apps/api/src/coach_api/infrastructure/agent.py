@@ -104,6 +104,13 @@ def build_agent(api_base: str, bearer: str | None = None) -> Any:
         base_url=settings.ollama_base_url,
         model=settings.ollama_model,
         temperature=0.2,
+        # Keep model resident in Ollama memory between requests — eliminates
+        # cold-start delay on the second and subsequent questions.
+        keep_alive="30m",
+        # Cap context window and output length: most replies are short and the
+        # full 8k window would slow generation noticeably on CPU.
+        num_ctx=4096,
+        num_predict=512,
     )
 
     client = _client(api_base, bearer)
@@ -194,10 +201,17 @@ def build_agent(api_base: str, bearer: str | None = None) -> Any:
     return create_react_agent(llm, tools=tools, prompt=SystemMessage(SYSTEM_PROMPT))
 
 
+# How many of the most recent user/assistant turns to send to the LLM.
+# Anything older is dropped to keep latency low — the agent can always
+# re-fetch data via tools if it needs it again.
+HISTORY_TURNS = 6
+
+
 def chat_once(agent: Any, user_message: str, history: list[dict] | None = None) -> str:
     """Invoke the agent with a single user message and return the reply text."""
     msgs: list = [SystemMessage(SYSTEM_PROMPT)]
-    for h in history or []:
+    recent = (history or [])[-HISTORY_TURNS:]
+    for h in recent:
         if h["role"] == "user":
             msgs.append(HumanMessage(h["content"]))
         elif h["role"] == "assistant":

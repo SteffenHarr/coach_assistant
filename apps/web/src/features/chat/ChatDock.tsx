@@ -57,9 +57,13 @@ export function ChatDock() {
     setInput("");
     setBusy(true);
     try {
+      // Only send the last few turns to keep the LLM prompt short — the
+      // backend additionally trims, but trimming client-side reduces
+      // payload size noticeably on slower connections.
+      const sentHistory = history.slice(-6);
       const r = await api<{ reply: string }>("/chat", {
         method: "POST",
-        body: JSON.stringify({ message: userMsg, history }),
+        body: JSON.stringify({ message: userMsg, history: sentHistory }),
       });
       setHistory([...next, { role: "assistant", content: r.reply }]);
     } catch (e) {

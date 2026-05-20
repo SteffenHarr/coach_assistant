@@ -30,6 +30,9 @@ from coach_api.infrastructure.repositories import (
 )
 from coach_api.infrastructure.security import limiter
 from coach_api.interfaces.schemas import (
+    AdminUserCreate,
+    AdminUserOut,
+    AdminUserPatch,
     ChatRequest,
     ChatResponse,
     CoachIn,
@@ -380,3 +383,318 @@ async def delete_my_account(
     await _audit(db, user, "delete", "user", str(user.id), {})
     await db.delete(user)
     await db.commit()
+
+
+# ---------- Admin: user management ----------
+#
+# Self-registration is disabled. Only admins can create users.
+
+
+require_admin = require_role(UserRole.ADMIN)
+
+
+@router.get("/admin/users", response_model=list[AdminUserOut])
+async def admin_list_users(
+    db: AsyncSession = Depends(get_db),
+    _: UserORM = Depends(require_admin),
+) -> list[AdminUserOut]:
+    from sqlalchemy import select
+
+    rows = (await db.execute(select(UserORM).order_by(UserORM.email))).scalars().all()
+    return [AdminUserOut.model_validate(r) for r in rows]
+
+
+@router.post("/admin/users", response_model=AdminUserOut, status_code=status.HTTP_201_CREATED)
+async def admin_create_user(
+    data: AdminUserCreate,
+    db: AsyncSession = Depends(get_db),
+    actor: UserORM = Depends(require_admin),
+) -> AdminUserOut:
+    from sqlalchemy import select
+
+    from coach_api.infrastructure.auth import Argon2PasswordHelper
+
+    existing = (
+        await db.execute(select(UserORM).where(UserORM.email == data.email))
+    ).scalar_one_or_none()
+    if existing is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "user already exists")
+
+    helper = Argon2PasswordHelper()
+    role = UserRole(data.role.lower())
+    user = UserORM(
+        email=data.email,
+        hashed_password=helper.hash(data.password),
+        role=role,
+        is_active=True,
+        is_verified=True,
+        is_superuser=(role == UserRole.ADMIN),
+    )
+    db.add(user)
+    await db.flush()  # get user.id before linking related rows
+
+    # Auto-create the matching domain record so the user can
+    # immediately start filling in their profile. Role assignment is
+    # exclusively the admin's responsibility — users cannot promote
+    # themselves to coach/player.
+    from coach_api.infrastructure.models import CoachORM, PlayerORM
+
+    label = data.email.split("@")[0]
+    if role == UserRole.COACH:
+        db.add(CoachORM(user_id=user.id, name=label, availability=[], constraints={}))
+    elif role == UserRole.PLAYER:
+        db.add(PlayerORM(user_id=user.id, name=label, availability=[], preferences={}))
+
+    await db.commit()
+    await db.refresh(user)
+    await _audit(db, actor, "create", "user", str(user.id), {"email": data.email, "role": data.role})
+    return AdminUserOut.model_validate(user)
+
+
+@router.patch("/admin/users/{user_id}", response_model=AdminUserOut)
+async def admin_update_user(
+    user_id: UUID,
+    data: AdminUserPatch,
+    db: AsyncSession = Depends(get_db),
+    actor: UserORM = Depends(require_admin),
+) -> AdminUserOut:
+    user = await db.get(UserORM, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user not found")
+    if data.role is not None:
+        new_role = UserRole(data.role.lower())
+        user.role = new_role
+        user.is_superuser = new_role == UserRole.ADMIN
+        # Provision the matching domain record if the new role implies one.
+        from sqlalchemy import select
+
+        from coach_api.infrastructure.models import CoachORM, PlayerORM
+
+        if new_role == UserRole.COACH:
+            existing = (
+                await db.execute(select(CoachORM).where(CoachORM.user_id == user.id))
+            ).scalar_one_or_none()
+            if existing is None:
+                db.add(
+                    CoachORM(
+                        user_id=user.id,
+                        name=user.email.split("@")[0],
+                        availability=[],
+                        constraints={},
+                    )
+                )
+        elif new_role == UserRole.PLAYER:
+            existing = (
+                await db.execute(select(PlayerORM).where(PlayerORM.user_id == user.id))
+            ).scalar_one_or_none()
+            if existing is None:
+                db.add(
+                    PlayerORM(
+                        user_id=user.id,
+                        name=user.email.split("@")[0],
+                        availability=[],
+                        preferences={},
+                    )
+                )
+    if data.is_active is not None:
+        user.is_active = data.is_active
+    if data.password is not None:
+        from coach_api.infrastructure.auth import Argon2PasswordHelper
+
+        user.hashed_password = Argon2PasswordHelper().hash(data.password)
+    await db.commit()
+    await db.refresh(user)
+    await _audit(db, actor, "update", "user", str(user.id), data.model_dump(exclude_none=True, exclude={"password"}))
+    return AdminUserOut.model_validate(user)
+
+
+@router.delete("/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_delete_user(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    actor: UserORM = Depends(require_admin),
+) -> None:
+    user = await db.get(UserORM, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user not found")
+    if user.id == actor.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "cannot delete yourself")
+    await db.delete(user)
+    await _audit(db, actor, "delete", "user", str(user_id), {})
+    await db.commit()
+
+
+# ---------- Profile (self-service) ----------
+#
+# These endpoints operate directly on the ORM rows so they can read/write the
+# extended profile fields that live inside the existing JSON columns
+# (PlayerORM.preferences, CoachORM.constraints) without a DB migration.
+
+from coach_api.infrastructure.models import CoachORM, PlayerORM  # noqa: E402
+
+
+def _coach_orm_to_dict(c: CoachORM) -> dict:
+    return {
+        "id": str(c.id),
+        "name": c.name,
+        "availability": sorted(c.availability or []),
+        "max_group_size": c.max_group_size,
+        "constraints": c.constraints or {},
+    }
+
+
+def _player_orm_to_dict(p: PlayerORM, *, include_level: bool = True) -> dict:
+    prefs = dict(p.preferences or {})
+    if not include_level:
+        prefs.pop("level_lk", None)
+    return {
+        "id": str(p.id),
+        "name": p.name,
+        "availability": sorted(p.availability or []),
+        "min_slots_per_week": p.min_slots_per_week,
+        "max_slots_per_week": p.max_slots_per_week,
+        "preferences": prefs,
+    }
+
+
+@router.get("/me/profile")
+async def get_my_profile(
+    db: AsyncSession = Depends(get_db),
+    user: UserORM = Depends(current_active_user),
+) -> dict:
+    """Return the authenticated user's coach- and/or player record.
+
+    A single user can have either, both, or neither linked via ``user_id``.
+    """
+    from sqlalchemy import select
+
+    coach_row = (
+        await db.execute(select(CoachORM).where(CoachORM.user_id == user.id))
+    ).scalar_one_or_none()
+    player_row = (
+        await db.execute(select(PlayerORM).where(PlayerORM.user_id == user.id))
+    ).scalar_one_or_none()
+    return {
+        "user": {"id": str(user.id), "email": user.email, "role": user.role},
+        "coach": _coach_orm_to_dict(coach_row) if coach_row else None,
+        "player": _player_orm_to_dict(player_row) if player_row else None,
+    }
+
+
+@router.put("/me/profile/coach")
+async def upsert_my_coach_profile(
+    data: CoachIn,
+    db: AsyncSession = Depends(get_db),
+    user: UserORM = Depends(require_role(UserRole.COACH, UserRole.ADMIN)),
+) -> dict:
+    from sqlalchemy import select
+
+    row = (
+        await db.execute(select(CoachORM).where(CoachORM.user_id == user.id))
+    ).scalar_one_or_none()
+    if row is None:
+        # Admin must have provisioned this record at user creation time.
+        # Self-promotion to coach is intentionally not allowed.
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Kein Trainer-Datensatz für diesen Benutzer. Bitte den Admin bitten, dich als Trainer anzulegen.",
+        )
+    row.name = data.name
+    row.availability = list(sorted(set(data.availability)))
+    row.constraints = data.constraints.model_dump(exclude_none=False)
+    row.max_group_size = data.max_group_size
+    await db.commit()
+    await db.refresh(row)
+    await _audit(db, user, "update", "coach_profile", str(row.id), {})
+    return _coach_orm_to_dict(row)
+
+
+@router.put("/me/profile/player")
+async def upsert_my_player_profile(
+    data: PlayerIn,
+    db: AsyncSession = Depends(get_db),
+    user: UserORM = Depends(require_role(UserRole.PLAYER, UserRole.COACH, UserRole.ADMIN)),
+) -> dict:
+    """Players can edit their own availability, preferences, age and weekly
+    target slots. The ``level_lk`` field is intentionally **stripped** here —
+    only coaches/admins may set it via ``PATCH /players/{id}/level``.
+
+    The user's player record must already exist; admins create it when they
+    provision the user."""
+    from sqlalchemy import select
+
+    row = (
+        await db.execute(select(PlayerORM).where(PlayerORM.user_id == user.id))
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Kein Spieler-Datensatz für diesen Benutzer. Bitte den Admin bitten, dich als Spieler anzulegen.",
+        )
+    incoming_prefs = data.preferences.model_dump(mode="json", exclude_none=False)
+    # Preserve any existing level_lk set by a coach.
+    existing_level = (row.preferences or {}).get("level_lk")
+    incoming_prefs["level_lk"] = existing_level
+
+    row.name = data.name
+    row.availability = list(sorted(set(data.availability)))
+    row.preferences = incoming_prefs
+    row.min_slots_per_week = data.min_slots_per_week
+    row.max_slots_per_week = data.max_slots_per_week
+    await db.commit()
+    await db.refresh(row)
+    await _audit(db, user, "update", "player_profile", str(row.id), {})
+    return _player_orm_to_dict(row)
+
+
+@router.patch("/players/{player_id}/level")
+async def set_player_level(
+    player_id: UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: UserORM = Depends(require_role(UserRole.COACH, UserRole.ADMIN)),
+) -> dict:
+    """Coach/Admin endpoint: set a player's LK level (1–25)."""
+    level = body.get("level_lk")
+    if level is not None and not (isinstance(level, int) and 1 <= level <= 25):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "level_lk must be 1..25 or null")
+    row = await db.get(PlayerORM, player_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "player not found")
+    prefs = dict(row.preferences or {})
+    prefs["level_lk"] = level
+    row.preferences = prefs
+    await db.commit()
+    await _audit(db, user, "update", "player_level", str(player_id), {"level_lk": level})
+    return {"id": str(row.id), "level_lk": level}
+
+
+@router.get("/players/full")
+async def list_players_full(
+    db: AsyncSession = Depends(get_db),
+    _user: UserORM = Depends(current_active_user),
+) -> list[dict]:
+    """Like ``GET /players`` but includes the extended JSON metadata fields
+    (age, level_lk, ...). Used by the Spieler tab."""
+    from sqlalchemy import select
+
+    rows = (await db.execute(select(PlayerORM).order_by(PlayerORM.name))).scalars().all()
+    return [_player_orm_to_dict(p) for p in rows]
+
+
+@router.get("/coaches/full")
+async def list_coaches_full(
+    db: AsyncSession = Depends(get_db),
+    _user: UserORM = Depends(current_active_user),
+) -> list[dict]:
+    from sqlalchemy import select
+
+    rows = (await db.execute(select(CoachORM).order_by(CoachORM.name))).scalars().all()
+    return [_coach_orm_to_dict(c) for c in rows]
+
+
+@router.get("/me", response_model=AdminUserOut)
+async def get_me(user: UserORM = Depends(current_active_user)) -> AdminUserOut:
+    """Return the currently authenticated user (used by the frontend to
+    decide whether to show admin features)."""
+    return AdminUserOut.model_validate(user)
