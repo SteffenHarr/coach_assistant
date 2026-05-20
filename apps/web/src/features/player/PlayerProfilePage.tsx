@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { AvailabilityGrid } from "../availability/AvailabilityGrid";
+import { NumberField } from "../../lib/NumberField";
 
 type Coach = { id: string; name: string };
 type Player = { id: string; name: string };
@@ -41,9 +42,9 @@ export function PlayerProfilePage() {
   });
 
   const [name, setName] = useState("");
-  const [age, setAge] = useState<string>("");
-  const [minSlots, setMinSlots] = useState(0);
-  const [maxSlots, setMaxSlots] = useState(4);
+  const [age, setAge] = useState<number | null>(null);
+  const [minSlots, setMinSlots] = useState<number | null>(0);
+  const [maxSlots, setMaxSlots] = useState<number | null>(4);
   const [slots, setSlots] = useState<number[]>([]);
   const [coachIds, setCoachIds] = useState<string[]>([]);
   const [partnerIds, setPartnerIds] = useState<string[]>([]);
@@ -55,7 +56,7 @@ export function PlayerProfilePage() {
       return;
     }
     setName(p.name);
-    setAge(p.preferences.age != null ? String(p.preferences.age) : "");
+    setAge(p.preferences.age ?? null);
     setMinSlots(p.min_slots_per_week);
     setMaxSlots(p.max_slots_per_week);
     setSlots(p.availability);
@@ -70,13 +71,13 @@ export function PlayerProfilePage() {
         body: JSON.stringify({
           name,
           availability: slots,
-          min_slots_per_week: minSlots,
-          max_slots_per_week: maxSlots,
+          min_slots_per_week: minSlots ?? 0,
+          max_slots_per_week: maxSlots ?? 0,
           preferences: {
             preferred_coach_ids: coachIds,
             preferred_partner_ids: partnerIds,
             allowed_session_types: ["single", "double", "group"],
-            age: age === "" ? null : Number(age),
+            age,
           },
         }),
       }),
@@ -98,17 +99,18 @@ export function PlayerProfilePage() {
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
-          <label style={{ width: 120 }}>
+          <label style={{ width: 140 }}>
             Alter
-            <input
-              type="number"
+            <NumberField
+              value={age}
+              onChange={setAge}
               min={3}
               max={120}
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
+              step={1}
+              placeholder="—"
             />
           </label>
-          <label style={{ width: 160 }}>
+          <label style={{ width: 200 }}>
             Spielstärke (LK)
             <input
               type="text"
@@ -117,24 +119,26 @@ export function PlayerProfilePage() {
               title="Nur Trainer/Admin können die LK setzen"
             />
           </label>
-          <label style={{ width: 140 }}>
+          <label style={{ width: 160 }}>
             Stunden/Woche min.
-            <input
-              type="number"
+            <NumberField
+              value={minSlots}
+              onChange={setMinSlots}
+              nullable={false}
               min={0}
               max={20}
-              value={minSlots}
-              onChange={(e) => setMinSlots(Number(e.target.value))}
+              step={1}
             />
           </label>
-          <label style={{ width: 140 }}>
+          <label style={{ width: 160 }}>
             Stunden/Woche max.
-            <input
-              type="number"
+            <NumberField
+              value={maxSlots}
+              onChange={setMaxSlots}
+              nullable={false}
               min={0}
               max={20}
-              value={maxSlots}
-              onChange={(e) => setMaxSlots(Number(e.target.value))}
+              step={1}
             />
           </label>
         </div>
@@ -143,7 +147,7 @@ export function PlayerProfilePage() {
       <div className="card">
         <h3 className="card__title">Wann kannst du?</h3>
         <p className="muted" style={{ fontSize: "var(--text-xs)" }}>
-          Klicke und ziehe, um Zeitfenster zu markieren (Mo–So, 30-Min-Raster).
+          Klicke und ziehe, um Zeitfenster zu markieren (Mo–So).
         </p>
         <AvailabilityGrid value={slots} onChange={setSlots} />
       </div>

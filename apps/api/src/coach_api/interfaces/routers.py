@@ -626,12 +626,16 @@ async def upsert_my_coach_profile(
         await db.execute(select(CoachORM).where(CoachORM.user_id == user.id))
     ).scalar_one_or_none()
     if row is None:
-        # Admin must have provisioned this record at user creation time.
-        # Self-promotion to coach is intentionally not allowed.
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            "Kein Trainer-Datensatz für diesen Benutzer. Bitte den Admin bitten, dich als Trainer anzulegen.",
-        )
+        # Self-promotion to coach is not allowed for regular users. Admins,
+        # however, may auto-provision their own coach record on the fly so
+        # they can act as both administrator and trainer.
+        if user.role != UserRole.ADMIN:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Kein Trainer-Datensatz für diesen Benutzer. Bitte den Admin bitten, dich als Trainer anzulegen.",
+            )
+        row = CoachORM(user_id=user.id, name=data.name or user.email.split("@")[0])
+        db.add(row)
     row.name = data.name
     row.availability = list(sorted(set(data.availability)))
     row.constraints = data.constraints.model_dump(exclude_none=False)
@@ -653,17 +657,20 @@ async def upsert_my_player_profile(
     only coaches/admins may set it via ``PATCH /players/{id}/level``.
 
     The user's player record must already exist; admins create it when they
-    provision the user."""
+    provision the user. Admins themselves may auto-provision."""
     from sqlalchemy import select
 
     row = (
         await db.execute(select(PlayerORM).where(PlayerORM.user_id == user.id))
     ).scalar_one_or_none()
     if row is None:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            "Kein Spieler-Datensatz für diesen Benutzer. Bitte den Admin bitten, dich als Spieler anzulegen.",
-        )
+        if user.role != UserRole.ADMIN:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Kein Spieler-Datensatz für diesen Benutzer. Bitte den Admin bitten, dich als Spieler anzulegen.",
+            )
+        row = PlayerORM(user_id=user.id, name=data.name or user.email.split("@")[0])
+        db.add(row)
     incoming_prefs = data.preferences.model_dump(mode="json", exclude_none=False)
     # Preserve any existing level_lk set by a coach.
     existing_level = (row.preferences or {}).get("level_lk")

@@ -11,6 +11,7 @@ import { PlanDetailPage } from "./features/plan/PlanDetailPage";
 import { PlanDiffView } from "./features/plan/PlanDiffView";
 import { AvailabilityPage } from "./features/availability/AvailabilityPage";
 import { CoachEditorPage } from "./features/coach/CoachEditorPage";
+import { CoachListPage } from "./features/coach/CoachListPage";
 import { CoachProfilePage } from "./features/coach/CoachProfilePage";
 import { PlayerListPage } from "./features/player/PlayerListPage";
 import { PlayerProfilePage } from "./features/player/PlayerProfilePage";
@@ -136,8 +137,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/plans/:planId" element={<App><PlanDetailPage /></App>} />
             <Route path="/verfuegbarkeiten" element={<App><AvailabilityPage /></App>} />
             <Route path="/trainer" element={<App><CoachLayout /></App>}>
-              <Route index element={<CoachEditorPage />} />
+              <Route index element={<CoachListPage />} />
               <Route path="profil" element={<CoachProfilePage />} />
+              <Route path="bulk" element={<CoachEditorPage />} />
             </Route>
             <Route path="/spieler" element={<App><PlayerLayout /></App>}>
               <Route index element={<PlayerListPage />} />

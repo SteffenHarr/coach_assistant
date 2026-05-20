@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { AvailabilityGrid } from "../availability/AvailabilityGrid";
+import { NumberField } from "../../lib/NumberField";
+import { SLOT_MINUTES } from "../../lib/timeGrid";
 
 type ProfileResponse = {
-  user: { role: string };
+  user: { role: string; email: string };
   coach: {
     id: string;
     name: string;
@@ -23,9 +25,10 @@ type ProfileResponse = {
   } | null;
 };
 
-function num(s: string): number | null {
-  return s === "" ? null : Number(s);
-}
+const slotsForHours = (h: number | null) =>
+  h == null ? null : Math.max(0, Math.round((h * 60) / SLOT_MINUTES));
+const hoursForSlots = (s: number | null | undefined): number | null =>
+  s == null ? null : (s * SLOT_MINUTES) / 60;
 
 export function CoachProfilePage() {
   const qc = useQueryClient();
@@ -36,34 +39,45 @@ export function CoachProfilePage() {
 
   const [name, setName] = useState("");
   const [slots, setSlots] = useState<number[]>([]);
-  const [maxGroup, setMaxGroup] = useState(4);
-  const [minBlock, setMinBlock] = useState(0);
-  const [maxDay, setMaxDay] = useState<string>("");
-  const [maxWeek, setMaxWeek] = useState<string>("");
-  const [minBreak, setMinBreak] = useState(0);
-  const [lkMin, setLkMin] = useState<string>("");
-  const [lkMax, setLkMax] = useState<string>("");
-  const [ageMin, setAgeMin] = useState<string>("");
-  const [ageMax, setAgeMax] = useState<string>("");
+  const [maxGroup, setMaxGroup] = useState<number | null>(4);
+  const [minBlockH, setMinBlockH] = useState<number | null>(0);
+  const [maxDayH, setMaxDayH] = useState<number | null>(null);
+  const [maxWeekH, setMaxWeekH] = useState<number | null>(null);
+  const [minBreakH, setMinBreakH] = useState<number | null>(0);
+  const [lkMin, setLkMin] = useState<number | null>(null);
+  const [lkMax, setLkMax] = useState<number | null>(null);
+  const [ageMin, setAgeMin] = useState<number | null>(null);
+  const [ageMax, setAgeMax] = useState<number | null>(null);
 
   useEffect(() => {
     const c = me.data?.coach;
     if (!c) {
-      setName(me.data?.user?.role === "coach" ? "" : "");
+      // No coach record yet — admin can create one on save.
+      setName(me.data?.user.email?.split("@")[0] ?? "");
+      setSlots([]);
+      setMaxGroup(4);
+      setMinBlockH(0);
+      setMaxDayH(null);
+      setMaxWeekH(null);
+      setMinBreakH(0);
+      setLkMin(null);
+      setLkMax(null);
+      setAgeMin(null);
+      setAgeMax(null);
       return;
     }
     setName(c.name);
     setSlots(c.availability);
     setMaxGroup(c.max_group_size);
     const k = c.constraints || {};
-    setMinBlock(k.min_block_slots ?? 0);
-    setMaxDay(k.max_slots_per_day != null ? String(k.max_slots_per_day) : "");
-    setMaxWeek(k.max_slots_per_week != null ? String(k.max_slots_per_week) : "");
-    setMinBreak(k.min_break_slots ?? 0);
-    setLkMin(k.accepts_lk_min != null ? String(k.accepts_lk_min) : "");
-    setLkMax(k.accepts_lk_max != null ? String(k.accepts_lk_max) : "");
-    setAgeMin(k.accepts_age_min != null ? String(k.accepts_age_min) : "");
-    setAgeMax(k.accepts_age_max != null ? String(k.accepts_age_max) : "");
+    setMinBlockH(hoursForSlots(k.min_block_slots ?? 0) ?? 0);
+    setMaxDayH(hoursForSlots(k.max_slots_per_day ?? null));
+    setMaxWeekH(hoursForSlots(k.max_slots_per_week ?? null));
+    setMinBreakH(hoursForSlots(k.min_break_slots ?? 0) ?? 0);
+    setLkMin(k.accepts_lk_min ?? null);
+    setLkMax(k.accepts_lk_max ?? null);
+    setAgeMin(k.accepts_age_min ?? null);
+    setAgeMax(k.accepts_age_max ?? null);
   }, [me.data]);
 
   const save = useMutation({
@@ -73,16 +87,16 @@ export function CoachProfilePage() {
         body: JSON.stringify({
           name,
           availability: slots,
-          max_group_size: maxGroup,
+          max_group_size: maxGroup ?? 4,
           constraints: {
-            min_block_slots: minBlock,
-            max_slots_per_day: num(maxDay),
-            max_slots_per_week: num(maxWeek),
-            min_break_slots: minBreak,
-            accepts_lk_min: num(lkMin),
-            accepts_lk_max: num(lkMax),
-            accepts_age_min: num(ageMin),
-            accepts_age_max: num(ageMax),
+            min_block_slots: slotsForHours(minBlockH ?? 0) ?? 0,
+            max_slots_per_day: slotsForHours(maxDayH),
+            max_slots_per_week: slotsForHours(maxWeekH),
+            min_break_slots: slotsForHours(minBreakH ?? 0) ?? 0,
+            accepts_lk_min: lkMin,
+            accepts_lk_max: lkMax,
+            accepts_age_min: ageMin,
+            accepts_age_max: ageMax,
           },
         }),
       }),
@@ -97,6 +111,19 @@ export function CoachProfilePage() {
         <p className="muted">Nur Trainer und Admins können hier Daten pflegen.</p>
       </section>
     );
+  // Coach role users without a record: blocked. Admins can self-provision by
+  // simply filling and saving the form.
+  if (me.data?.coach == null && me.data?.user.role === "coach")
+    return (
+      <section>
+        <h2>Mein Trainer-Profil</h2>
+        <p className="muted">
+          Für deinen Account ist noch kein Trainer-Datensatz angelegt. Bitte
+          einen Admin, dich als Trainer zu hinterlegen
+          (Benutzer-Verwaltung → Rolle „Trainer").
+        </p>
+      </section>
+    );
 
   return (
     <section className="stack">
@@ -109,14 +136,15 @@ export function CoachProfilePage() {
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
-          <label style={{ width: 160 }}>
+          <label style={{ width: 180 }}>
             Max. Gruppengröße
-            <input
-              type="number"
+            <NumberField
+              value={maxGroup}
+              onChange={setMaxGroup}
+              nullable={false}
               min={1}
               max={12}
-              value={maxGroup}
-              onChange={(e) => setMaxGroup(Number(e.target.value))}
+              step={1}
             />
           </label>
         </div>
@@ -125,49 +153,51 @@ export function CoachProfilePage() {
       <div className="card">
         <h3 className="card__title">Arbeitszeit-Regeln</h3>
         <p className="muted" style={{ fontSize: "var(--text-xs)" }}>
-          1 Slot = 30 Minuten.
+          Angaben in Stunden. Felder leer lassen heißt „keine Einschränkung".
         </p>
         <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
-          <label style={{ width: 200 }}>
-            Mindest-Block am Stück
-            <input
-              type="number"
+          <label style={{ width: 220 }}>
+            Mindest-Block am Stück (h)
+            <NumberField
+              value={minBlockH}
+              onChange={setMinBlockH}
+              nullable={false}
               min={0}
-              max={48}
-              value={minBlock}
-              onChange={(e) => setMinBlock(Number(e.target.value))}
+              max={24}
+              step={0.5}
             />
           </label>
-          <label style={{ width: 200 }}>
-            Max. Slots / Tag
-            <input
-              type="number"
+          <label style={{ width: 220 }}>
+            Max. Stunden / Tag
+            <NumberField
+              value={maxDayH}
+              onChange={setMaxDayH}
               min={0}
-              max={48}
-              value={maxDay}
-              onChange={(e) => setMaxDay(e.target.value)}
+              max={24}
+              step={0.5}
               placeholder="kein Limit"
             />
           </label>
-          <label style={{ width: 200 }}>
-            Max. Slots / Woche
-            <input
-              type="number"
+          <label style={{ width: 220 }}>
+            Max. Stunden / Woche
+            <NumberField
+              value={maxWeekH}
+              onChange={setMaxWeekH}
               min={0}
-              max={336}
-              value={maxWeek}
-              onChange={(e) => setMaxWeek(e.target.value)}
+              max={168}
+              step={0.5}
               placeholder="kein Limit"
             />
           </label>
-          <label style={{ width: 200 }}>
-            Mindest-Pause zwischen Blöcken
-            <input
-              type="number"
+          <label style={{ width: 220 }}>
+            Mindest-Pause zwischen Blöcken (h)
+            <NumberField
+              value={minBreakH}
+              onChange={setMinBreakH}
+              nullable={false}
               min={0}
-              max={48}
-              value={minBreak}
-              onChange={(e) => setMinBreak(Number(e.target.value))}
+              max={24}
+              step={0.5}
             />
           </label>
         </div>
@@ -176,49 +206,52 @@ export function CoachProfilePage() {
       <div className="card">
         <h3 className="card__title">Ich trainiere…</h3>
         <p className="muted" style={{ fontSize: "var(--text-xs)" }}>
-          Diese Angaben sind aktuell rein informativ — der Solver berücksichtigt sie noch nicht automatisch.
+          Der Solver berücksichtigt diese Werte als harte Einschränkungen.
+          Felder leer lassen heißt „keine Einschränkung".
         </p>
         <div className="row" style={{ flexWrap: "wrap", gap: 12 }}>
-          <label style={{ width: 180 }}>
+          <label style={{ width: 200 }}>
             Spielstärke (LK) min.
-            <input
-              type="number"
+            <NumberField
+              value={lkMin}
+              onChange={setLkMin}
               min={1}
               max={25}
-              value={lkMin}
-              onChange={(e) => setLkMin(e.target.value)}
-              placeholder="z.B. 5"
+              step={1}
+              placeholder="z.B. 1"
             />
           </label>
-          <label style={{ width: 180 }}>
+          <label style={{ width: 200 }}>
             Spielstärke (LK) max.
-            <input
-              type="number"
+            <NumberField
+              value={lkMax}
+              onChange={setLkMax}
               min={1}
               max={25}
-              value={lkMax}
-              onChange={(e) => setLkMax(e.target.value)}
+              step={1}
               placeholder="z.B. 25"
             />
           </label>
-          <label style={{ width: 180 }}>
+          <label style={{ width: 200 }}>
             Alter min.
-            <input
-              type="number"
+            <NumberField
+              value={ageMin}
+              onChange={setAgeMin}
               min={3}
               max={120}
-              value={ageMin}
-              onChange={(e) => setAgeMin(e.target.value)}
+              step={1}
+              placeholder="kein Limit"
             />
           </label>
-          <label style={{ width: 180 }}>
+          <label style={{ width: 200 }}>
             Alter max.
-            <input
-              type="number"
+            <NumberField
+              value={ageMax}
+              onChange={setAgeMax}
               min={3}
               max={120}
-              value={ageMax}
-              onChange={(e) => setAgeMax(e.target.value)}
+              step={1}
+              placeholder="kein Limit"
             />
           </label>
         </div>
