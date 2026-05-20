@@ -39,9 +39,44 @@ export async function login(email: string, password: string): Promise<void> {
 
 export function logout(): void {
   sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("user_role");
   window.dispatchEvent(new StorageEvent("storage", { key: "access_token" }));
 }
 
 export function isLoggedIn(): boolean {
   return !!sessionStorage.getItem("access_token");
+}
+
+/**
+ * POST a JSON body and stream the response back as text chunks. The
+ * callback ``onChunk`` is invoked with each decoded UTF-8 segment as it
+ * arrives. Resolves once the stream ends; rejects on HTTP errors.
+ */
+export async function postStream(
+  path: string,
+  body: unknown,
+  onChunk: (text: string) => void,
+): Promise<void> {
+  const res = await fetch(`${API}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader(),
+    },
+    body: JSON.stringify(body),
+    credentials: "same-origin",
+  });
+  if (!res.ok || !res.body) {
+    throw new Error(`${res.status} ${res.statusText}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if (value && value.length > 0) onChunk(decoder.decode(value, { stream: true }));
+  }
+  // Flush any remaining buffered bytes.
+  const tail = decoder.decode();
+  if (tail) onChunk(tail);
 }

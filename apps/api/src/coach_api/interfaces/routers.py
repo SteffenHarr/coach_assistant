@@ -117,8 +117,9 @@ async def list_coaches(
 async def create_coach(
     data: CoachIn,
     db: AsyncSession = Depends(get_db),
-    user: UserORM = Depends(require_role(UserRole.ADMIN, UserRole.COACH)),
+    user: UserORM = Depends(require_role(UserRole.ADMIN)),
 ) -> CoachOut:
+    # Admin-only: coaches edit *their own* record via PUT /me/profile/coach.
     repo = SqlCoachRepository(db)
     coach = Coach(
         name=data.name,
@@ -163,8 +164,10 @@ async def list_players(
 async def create_player(
     data: PlayerIn,
     db: AsyncSession = Depends(get_db),
-    user: UserORM = Depends(require_role(UserRole.ADMIN, UserRole.COACH)),
+    user: UserORM = Depends(require_role(UserRole.ADMIN)),
 ) -> PlayerOut:
+    # Admin-only: players edit *their own* record via PUT /me/profile/player.
+    # Coaches set player LK via PATCH /players/{id}/level.
     repo = SqlPlayerRepository(db)
     player = Player(
         name=data.name,
@@ -352,6 +355,36 @@ async def chat(
     history = [m.model_dump() for m in data.history]
     reply = chat_once(agent, data.message, history)
     return ChatResponse(reply=reply)
+
+
+@router.post("/chat/stream")
+async def chat_stream_endpoint(
+    data: ChatRequest,
+    request: Request,
+    user: UserORM = Depends(current_active_user),
+):
+    """Streaming chat endpoint — yields plain text chunks as the LLM
+    produces them. The frontend reads the response body as a stream and
+    appends each chunk to the current assistant bubble for near-zero
+    perceived latency."""
+    from fastapi.responses import StreamingResponse
+
+    from coach_api.infrastructure.agent import build_agent, chat_stream
+
+    bearer = request.headers.get("authorization", "").removeprefix("Bearer ").strip() or None
+    api_base = str(request.base_url).rstrip("/")
+    agent = build_agent(api_base=api_base, bearer=bearer)
+    history = [m.model_dump() for m in data.history]
+
+    async def gen():
+        async for token in chat_stream(agent, data.message, history):
+            yield token
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/plain; charset=utf-8",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 # ---------- GDPR endpoints ----------

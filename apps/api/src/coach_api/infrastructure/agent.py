@@ -219,3 +219,31 @@ def chat_once(agent: Any, user_message: str, history: list[dict] | None = None) 
     msgs.append(HumanMessage(user_message))
     out = agent.invoke({"messages": msgs})
     return out["messages"][-1].content
+
+
+async def chat_stream(agent: Any, user_message: str, history: list[dict] | None = None):
+    """Async generator yielding text tokens of the assistant's reply.
+
+    Internally uses LangGraph's ``stream_mode='messages'`` which emits
+    ``AIMessageChunk`` objects as they are produced by the underlying LLM.
+    Tool-call chunks (intermediate reasoning) are silently dropped — only
+    the final user-visible content tokens are forwarded.
+    """
+    from langchain_core.messages import AIMessageChunk
+
+    msgs: list = [SystemMessage(SYSTEM_PROMPT)]
+    recent = (history or [])[-HISTORY_TURNS:]
+    for h in recent:
+        if h["role"] == "user":
+            msgs.append(HumanMessage(h["content"]))
+        elif h["role"] == "assistant":
+            msgs.append(AIMessage(h["content"]))
+    msgs.append(HumanMessage(user_message))
+
+    async for chunk, _meta in agent.astream(
+        {"messages": msgs}, stream_mode="messages"
+    ):
+        if isinstance(chunk, AIMessageChunk):
+            text = chunk.content
+            if isinstance(text, str) and text:
+                yield text

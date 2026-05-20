@@ -32,7 +32,10 @@ class Settings(BaseSettings):
 
     # LLM
     ollama_base_url: str = "http://ollama:11434"
-    ollama_model: str = "llama3.1:8b-instruct-q4_K_M"
+    # 3B model: ~4× faster than 8B on CPU, still good enough for short
+    # German Q&A and the limited tool-calling we do. Override via env
+    # OLLAMA_MODEL to use a bigger / smaller model.
+    ollama_model: str = "llama3.2:3b-instruct-q4_K_M"
     agent_max_tool_calls: int = 10
     agent_require_confirmation: bool = True
 

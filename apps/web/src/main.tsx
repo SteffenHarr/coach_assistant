@@ -28,7 +28,11 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 function AuthNavLink() {
   const [authed, setAuthed] = useState<boolean>(isLoggedIn);
-  const [role, setRole] = useState<string | null>(null);
+  // Seed from sessionStorage so the role-gated nav links stay visible
+  // immediately after a page reload, before /me has answered.
+  const [role, setRole] = useState<string | null>(
+    () => sessionStorage.getItem("user_role"),
+  );
   const nav = useNavigate();
 
   useEffect(() => {
@@ -37,16 +41,21 @@ function AuthNavLink() {
       setAuthed(ok);
       if (ok) {
         api<{ role: string }>("/me")
-          .then((u) => setRole(u.role))
-          .catch(() => setRole(null));
+          .then((u) => {
+            setRole(u.role);
+            sessionStorage.setItem("user_role", u.role);
+          })
+          // Network blip: keep the cached role rather than dropping nav items.
+          .catch(() => {});
       } else {
         setRole(null);
+        sessionStorage.removeItem("user_role");
       }
     };
     refresh();
     window.addEventListener("focus", refresh);
     window.addEventListener("storage", refresh);
-    const id = window.setInterval(refresh, 5000);
+    const id = window.setInterval(refresh, 15000);
     return () => {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("storage", refresh);
@@ -90,6 +99,16 @@ function AuthNavLink() {
   );
 }
 
+function AdminOnlyLink({ to, label }: { to: string; label: string }) {
+  const role = sessionStorage.getItem("user_role");
+  if (role !== "admin") return null;
+  return (
+    <NavLink to={to} className={navLinkClass}>
+      {label}
+    </NavLink>
+  );
+}
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={qc}>
@@ -101,7 +120,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               Coach Assistant
             </Link>
             <NavLink to="/plaene" className={navLinkClass}>Pläne</NavLink>
-            <NavLink to="/verfuegbarkeiten" className={navLinkClass}>Verfügbarkeiten</NavLink>
+            <AdminOnlyLink to="/verfuegbarkeiten" label="Verfügbarkeiten" />
             <span className="app-nav__spacer" />
             <AuthNavLink />
           </nav>

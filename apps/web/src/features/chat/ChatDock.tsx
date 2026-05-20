@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../../api/client";
+import { postStream } from "../../api/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -52,29 +52,36 @@ export function ChatDock() {
   async function send() {
     if (!input.trim() || busy) return;
     const userMsg = input.trim();
-    const next: Msg[] = [...history, { role: "user", content: userMsg }];
-    setHistory(next);
+    const baseHistory: Msg[] = [...history, { role: "user", content: userMsg }];
+    // Add an empty assistant bubble that we'll fill incrementally.
+    setHistory([...baseHistory, { role: "assistant", content: "" }]);
     setInput("");
     setBusy(true);
     try {
-      // Only send the last few turns to keep the LLM prompt short — the
-      // backend additionally trims, but trimming client-side reduces
-      // payload size noticeably on slower connections.
+      // Only send the last few turns to keep the LLM prompt short.
       const sentHistory = history.slice(-6);
-      const r = await api<{ reply: string }>("/chat", {
-        method: "POST",
-        body: JSON.stringify({ message: userMsg, history: sentHistory }),
-      });
-      setHistory([...next, { role: "assistant", content: r.reply }]);
+      let acc = "";
+      await postStream(
+        "/chat/stream",
+        { message: userMsg, history: sentHistory },
+        (chunk) => {
+          acc += chunk;
+          setHistory([...baseHistory, { role: "assistant", content: acc }]);
+        },
+      );
+      // If the model returned nothing, replace the empty bubble with a hint.
+      if (!acc.trim()) {
+        setHistory([
+          ...baseHistory,
+          { role: "assistant", content: "(keine Antwort erhalten)" },
+        ]);
+      }
     } catch (e) {
       const msg = (e as Error).message;
       const friendly = msg.startsWith("401")
         ? "Du bist nicht angemeldet. Bitte klicke oben rechts auf 'Anmelden' und logge dich ein."
         : "Fehler: " + msg;
-      setHistory([
-        ...next,
-        { role: "assistant", content: friendly },
-      ]);
+      setHistory([...baseHistory, { role: "assistant", content: friendly }]);
     } finally {
       setBusy(false);
     }
@@ -159,15 +166,13 @@ export function ChatDock() {
               <div className="chatdock__msg-role">
                 {m.role === "user" ? "Du" : "Assistent"}
               </div>
-              <div className="chatdock__msg-text">{m.content}</div>
+              <div className="chatdock__msg-text">
+                {m.content || (
+                  <span className="muted">denkt nach…</span>
+                )}
+              </div>
             </div>
           ))}
-          {busy && (
-            <div className="chatdock__msg chatdock__msg--assistant">
-              <div className="chatdock__msg-role">Assistent</div>
-              <div className="chatdock__msg-text muted">denkt nach…</div>
-            </div>
-          )}
           <div ref={bottomRef} />
         </div>
 
