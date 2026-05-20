@@ -1,7 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, NavLink, Link } from "react-router-dom";
+import { BrowserRouter, Route, Routes, NavLink, Link, useNavigate } from "react-router-dom";
 import { App } from "./App";
 import { ChatPanel } from "./features/chat/ChatPanel";
 import { ChatDock } from "./features/chat/ChatDock";
@@ -12,12 +13,50 @@ import { AvailabilityPage } from "./features/availability/AvailabilityPage";
 import { CoachEditorPage } from "./features/coach/CoachEditorPage";
 import { ReplanWizard } from "./features/replan/ReplanWizard";
 import { LoginPage } from "./features/auth/LoginPage";
+import { isLoggedIn, logout } from "./api/client";
 import "./index.css";
 
 const qc = new QueryClient();
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   "app-nav__link" + (isActive ? " app-nav__link--active" : "");
+
+function AuthNavLink() {
+  const [authed, setAuthed] = useState<boolean>(isLoggedIn);
+  const nav = useNavigate();
+
+  useEffect(() => {
+    const refresh = () => setAuthed(isLoggedIn());
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    const id = window.setInterval(refresh, 1000);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+      window.clearInterval(id);
+    };
+  }, []);
+
+  if (authed) {
+    return (
+      <button
+        className="app-nav__link"
+        style={{ background: "transparent", border: "none", cursor: "pointer" }}
+        onClick={() => {
+          logout();
+          nav("/login");
+        }}
+      >
+        Abmelden
+      </button>
+    );
+  }
+  return (
+    <NavLink to="/login" className={navLinkClass}>
+      Anmelden
+    </NavLink>
+  );
+}
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -35,7 +74,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <NavLink to="/diff" className={navLinkClass}>Vergleich</NavLink>
             <NavLink to="/replan" className={navLinkClass}>Saisonwechsel</NavLink>
             <span className="app-nav__spacer" />
-            <NavLink to="/login" className={navLinkClass}>Anmelden</NavLink>
+            <AuthNavLink />
           </nav>
           <Routes>
             <Route path="/" element={<App><PlansPage /></App>} />

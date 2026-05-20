@@ -36,3 +36,12 @@ export async function login(email: string, password: string): Promise<void> {
   // Notify same-tab listeners (e.g. ChatDock) that auth state changed.
   window.dispatchEvent(new StorageEvent("storage", { key: "access_token" }));
 }
+
+export function logout(): void {
+  sessionStorage.removeItem("access_token");
+  window.dispatchEvent(new StorageEvent("storage", { key: "access_token" }));
+}
+
+export function isLoggedIn(): boolean {
+  return !!sessionStorage.getItem("access_token");
+}

@@ -191,7 +191,7 @@ def build_agent(api_base: str, bearer: str | None = None) -> Any:
         generate_plans,
     ]
 
-    return create_react_agent(llm, tools=tools, state_modifier=SystemMessage(SYSTEM_PROMPT))
+    return create_react_agent(llm, tools=tools, prompt=SystemMessage(SYSTEM_PROMPT))
 
 
 def chat_once(agent: Any, user_message: str, history: list[dict] | None = None) -> str:

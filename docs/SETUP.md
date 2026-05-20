@@ -175,12 +175,12 @@ Erster Test: Browser öffnen → http://localhost
      "password": "ein-sehr-langes-passwort-mind-12-zeichen"
    }
    ```
-4. „Execute" klicken. Antwort sollte `200 OK` zeigen.
+4. „Execute" klicken. Antwort sollte `201` zeigen.
 5. **Den User zum Admin machen:** zurück in die PowerShell:
    ```powershell
    docker compose --env-file .env -f deploy/docker-compose.yml exec db `
      psql -U coach -d coach_assistant `
-     -c "UPDATE users SET is_superuser=true, is_verified=true, role='admin' WHERE email='admin@dein-verein.de';"
+     -c "UPDATE users SET is_superuser=true, is_verified=true, role='ADMIN' WHERE email='admin@dein-verein.de';"
    ```
    (E-Mail im Befehl anpassen.)
 
