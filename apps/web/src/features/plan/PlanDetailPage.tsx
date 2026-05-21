@@ -81,7 +81,8 @@ export function PlanDetailPage() {
       const next = [...d];
       const s = next[idx];
       if (!s || s.slot_indices.length === 0) return d;
-      const delta = newStartSlot - s.slot_indices[0];
+      const first = s.slot_indices[0]!;
+      const delta = newStartSlot - first;
       // Clamp innerhalb desselben Tages? Wir lassen frei aber clampen zu Tagesgrenzen.
       const targetDay = Math.floor(newStartSlot / SLOTS_PER_DAY);
       const dayStart = targetDay * SLOTS_PER_DAY;
@@ -96,7 +97,9 @@ export function PlanDetailPage() {
   function updateSession(idx: number, patch: Partial<Session>) {
     setDraft((d) => {
       const next = [...d];
-      next[idx] = { ...next[idx], ...patch };
+      const cur = next[idx];
+      if (!cur) return d;
+      next[idx] = { ...cur, ...patch };
       return next;
     });
   }
@@ -232,16 +235,19 @@ function SessionEditor({
   function setStart(newDay: number, newLocal: number) {
     const base = newDay * SLOTS_PER_DAY + newLocal;
     const slots = Array.from({ length: duration }, (_, i) => base + i);
-    if (slots[slots.length - 1] >= (newDay + 1) * SLOTS_PER_DAY) return;
+    const last = slots[slots.length - 1];
+    if (last === undefined || last >= (newDay + 1) * SLOTS_PER_DAY) return;
     onChange({ slot_indices: slots });
   }
 
   function setDuration(newDur: number) {
     if (newDur < 1) return;
     const base = session.slot_indices[0];
+    if (base === undefined) return;
     const dayEnd = (Math.floor(base / SLOTS_PER_DAY) + 1) * SLOTS_PER_DAY;
     const slots = Array.from({ length: newDur }, (_, i) => base + i);
-    if (slots[slots.length - 1] >= dayEnd) return;
+    const last = slots[slots.length - 1];
+    if (last === undefined || last >= dayEnd) return;
     onChange({ slot_indices: slots });
   }
 
