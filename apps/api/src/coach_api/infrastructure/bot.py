@@ -12,6 +12,11 @@ Resolution order in :func:`answer`:
   5. Help fallback.
 
 Sub-10ms response time, no GPU/CPU spike. German-first matching.
+
+NOTE: This module deliberately uses only ASCII quotation marks in source
+code (escaped as \\" inside f-strings). German typographic quotes such as
+U+201E / U+201C inside source code break Python's string parser when
+combined with line continuations.
 """
 
 from __future__ import annotations
@@ -38,12 +43,7 @@ from coach_api.infrastructure.models import (
 
 @dataclass(slots=True)
 class Topic:
-    """A single knowledge entry.
-
-    Matched if the message contains AT LEAST ONE of the `keywords` AND,
-    if `requires` is given, at least one keyword from each of those
-    additional groups (logical AND of OR-groups).
-    """
+    """A single knowledge entry."""
 
     title: str
     keywords: set[str]
@@ -51,7 +51,7 @@ class Topic:
     requires: list[set[str]] = field(default_factory=list)
 
 
-# IMPORTANT: more specific topics MUST come first — first match wins.
+# IMPORTANT: more specific topics MUST come first - first match wins.
 KNOWLEDGE: list[Topic] = [
     # ---------- Meta / help ----------
     Topic(
@@ -60,34 +60,34 @@ KNOWLEDGE: list[Topic] = [
         answer=(
             "Ich beantworte Fragen rund um den Coach Assistant. Themen, die "
             "ich abdecke:\n\n"
-            "**📊 Daten abfragen**\n"
-            "• „Welche Trainer/Spieler/Plätze/Saisons haben wir?"\n"
-            "• „Wie viele Benutzer gibt es?"\n"
-            "• „Zeig mir die letzten Pläne"\n\n"
-            "**📅 Pläne**\n"
-            "• „Wie erstelle ich einen Plan?"\n"
-            "• „Wie vergleiche ich zwei Pläne?"\n"
-            "• „Was ist der Saisonwechsel?"\n"
-            "• „Was bedeutet der Plan-Score?"\n\n"
-            "**🧠 Solver**\n"
-            "• „Wie funktioniert der Solver?"\n"
-            "• „Was sind harte/weiche Constraints?"\n"
-            "• „Warum ist mein Plan leer/infeasible?"\n\n"
-            "**👥 Benutzer & Rollen**\n"
-            "• „Wie lege ich einen Trainer/Spieler an?"\n"
-            "• „Was darf Admin/Trainer/Spieler?"\n"
-            "• „Wie ändere ich ein Passwort?"\n\n"
-            "**🎾 Tennis-Konzepte**\n"
-            "• „Was bedeutet LK?", „Was ist Spielstärke?"\n"
-            "• „Was sind Gruppengrößen?"\n\n"
-            "**⏰ Verfügbarkeit & Profil**\n"
-            "• „Wie ändere ich meine Verfügbarkeit?"\n"
-            "• „Wie ändere ich mein Profil?"\n\n"
-            "**🔒 Datenschutz & Betrieb**\n"
-            "• „Wie exportiere ich meine Daten?"\n"
-            "• „Wie lösche ich mein Konto?"\n"
-            "• „Wie wird ein Backup gemacht?"\n\n"
-            "Schreibe einfach eine Frage — ich erkenne die Stichworte."
+            "**Daten abfragen**\n"
+            "- 'Welche Trainer/Spieler/Plätze/Saisons haben wir?'\n"
+            "- 'Wie viele Benutzer gibt es?'\n"
+            "- 'Zeig mir die letzten Pläne'\n\n"
+            "**Pläne**\n"
+            "- 'Wie erstelle ich einen Plan?'\n"
+            "- 'Wie vergleiche ich zwei Pläne?'\n"
+            "- 'Was ist der Saisonwechsel?'\n"
+            "- 'Was bedeutet der Plan-Score?'\n\n"
+            "**Solver**\n"
+            "- 'Wie funktioniert der Solver?'\n"
+            "- 'Was sind harte/weiche Constraints?'\n"
+            "- 'Warum ist mein Plan leer/infeasible?'\n\n"
+            "**Benutzer & Rollen**\n"
+            "- 'Wie lege ich einen Trainer/Spieler an?'\n"
+            "- 'Was darf Admin/Trainer/Spieler?'\n"
+            "- 'Wie ändere ich ein Passwort?'\n\n"
+            "**Tennis-Konzepte**\n"
+            "- 'Was bedeutet LK?', 'Was ist Spielstärke?'\n"
+            "- 'Was sind Gruppengrößen?'\n\n"
+            "**Verfügbarkeit & Profil**\n"
+            "- 'Wie ändere ich meine Verfügbarkeit?'\n"
+            "- 'Wie ändere ich mein Profil?'\n\n"
+            "**Datenschutz & Betrieb**\n"
+            "- 'Wie exportiere ich meine Daten?'\n"
+            "- 'Wie lösche ich mein Konto?'\n"
+            "- 'Wie wird ein Backup gemacht?'\n\n"
+            "Schreibe einfach eine Frage - ich erkenne die Stichworte."
         ),
     ),
     Topic(
@@ -98,7 +98,7 @@ KNOWLEDGE: list[Topic] = [
             "Regel-Bot. Ich erkenne Stichworte und liefere fest hinterlegte "
             "Antworten oder Live-Daten aus der Datenbank. Vorteil: blitzschnell, "
             "keine Halluzinationen, kein GPU-Bedarf. Nachteil: ich kann nur "
-            "Themen beantworten, die ich kenne — tippe **hilfe** für die Liste."
+            "Themen beantworten, die ich kenne - tippe **hilfe** für die Liste."
         ),
     ),
 
@@ -107,13 +107,13 @@ KNOWLEDGE: list[Topic] = [
         title="LK / Leistungsklasse",
         keywords={"lk", "leistungsklasse", "spielstärke", "spielstaerke", "ranking", "level"},
         answer=(
-            "**LK = Leistungsklasse** (deutsche Tennis-Skala 1–25).\n"
-            "• LK 1 = Profi/Top-Spieler\n"
-            "• LK 25 = absoluter Anfänger\n\n"
+            "**LK = Leistungsklasse** (deutsche Tennis-Skala 1-25).\n"
+            "- LK 1 = Profi/Top-Spieler\n"
+            "- LK 25 = absoluter Anfänger\n\n"
             "Im Coach Assistant:\n"
-            "• Die LK eines Spielers setzt **nur ein Trainer** "
-            "(Reiter *Spieler → Liste*, Inline-Editor in der LK-Spalte).\n"
-            "• Trainer hinterlegen in ihrem Profil, welchen LK-Bereich sie "
+            "- Die LK eines Spielers setzt **nur ein Trainer** "
+            "(Reiter *Spieler -> Liste*, Inline-Editor in der LK-Spalte).\n"
+            "- Trainer hinterlegen in ihrem Profil, welchen LK-Bereich sie "
             "trainieren (`accepts_lk_min`/`accepts_lk_max`). Der Solver "
             "kombiniert dann nur passende Trainer mit Spielern."
         ),
@@ -122,7 +122,7 @@ KNOWLEDGE: list[Topic] = [
         title="Saison",
         keywords={"saison", "season", "halbjahr", "trainingsperiode", "periode"},
         answer=(
-            "Eine **Saison** ist eine Trainingsperiode (z.B. „Sommer 2026"). "
+            "Eine **Saison** ist eine Trainingsperiode (z.B. 'Sommer 2026'). "
             "Pro Saison wird **ein wöchentlicher Plan** erstellt, der sich "
             "Woche für Woche wiederholt, bis die Saison endet.\n\n"
             "Felder einer Saison: Name, `valid_from`, `valid_to`. Beim "
@@ -135,9 +135,9 @@ KNOWLEDGE: list[Topic] = [
         keywords={"gruppengröße", "gruppengroesse", "gruppe", "gruppen", "max_group", "1er", "2er", "einzeltraining", "gruppentraining"},
         answer=(
             "Eine **Gruppe** ist die Teilnehmerzahl einer Session.\n"
-            "• 1 = Einzeltraining\n"
-            "• 2 = Doppel-/Zweier-Gruppe\n"
-            "• 3–4 = klassisches Gruppentraining\n\n"
+            "- 1 = Einzeltraining\n"
+            "- 2 = Doppel-/Zweier-Gruppe\n"
+            "- 3-4 = klassisches Gruppentraining\n\n"
             "Jeder Trainer hat in seinem Profil ein `max_group_size` (z.B. 4). "
             "Der Solver darf für diesen Trainer keine Gruppe größer als "
             "`max_group_size` planen."
@@ -148,10 +148,10 @@ KNOWLEDGE: list[Topic] = [
         keywords={"slot", "slots", "zeitraster", "raster", "30 min", "30-min", "halbstunde", "zeitschiene"},
         answer=(
             "Die App rechnet intern in **30-Minuten-Slots**. Ein Trainingstag "
-            "hat 30 Slots (06:00–21:00 = 15 h × 2). Eine ganze Trainingswoche "
-            "hat **210 Slots** (7 Tage × 30 Slots).\n\n"
+            "hat 30 Slots (06:00-21:00 = 15h x 2). Eine ganze Trainingswoche "
+            "hat **210 Slots** (7 Tage x 30 Slots).\n\n"
             "Für dich als Nutzer: du gibst alle Werte in **Stunden** ein "
-            "(z.B. „min 1 h, max 6 h pro Tag"); die App rechnet das intern in "
+            "(z.B. 'min 1h, max 6h pro Tag'); die App rechnet das intern in "
             "Slots um."
         ),
     ),
@@ -161,13 +161,13 @@ KNOWLEDGE: list[Topic] = [
         title="Plan erstellen / Saisonwechsel",
         keywords={"saisonwechsel", "neuen plan", "plan erstellen", "plan generieren", "plan rechnen", "wizard", "replan"},
         answer=(
-            "**Plan erstellen** (Reiter *Pläne → Saisonwechsel*):\n"
+            "**Plan erstellen** (Reiter *Pläne -> Saisonwechsel*):\n"
             "1. Saison auswählen (oder neu anlegen).\n"
             "2. Eingangsdaten prüfen: alle Trainer/Spieler haben Verfügbarkeit?\n"
-            "3. Solver starten — er erzeugt bis zu **3 Plan-Varianten**.\n"
-            "4. Variante mit höchstem Score auswählen → **Aktivieren**.\n"
+            "3. Solver starten - er erzeugt bis zu **3 Plan-Varianten**.\n"
+            "4. Variante mit höchstem Score auswählen -> **Aktivieren**.\n"
             "5. Optional: alten und neuen Plan **vergleichen** "
-            "(Reiter *Pläne → Vergleichen*).\n\n"
+            "(Reiter *Pläne -> Vergleichen*).\n\n"
             "Der Plan ist immer **wöchentlich wiederkehrend**. Eine Änderung "
             "bedeutet immer einen neuen Plan, nicht das Editieren des alten."
         ),
@@ -176,13 +176,13 @@ KNOWLEDGE: list[Topic] = [
         title="Plan vergleichen",
         keywords={"vergleich", "compare", "diff", "unterschied", "alt vs neu", "alt und neu"},
         answer=(
-            "**Pläne vergleichen** (Reiter *Pläne → Vergleichen*):\n"
-            "• Wähle zwei Pläne (z.B. alter aktiver Plan vs. neue Variante).\n"
-            "• Du siehst:\n"
-            "   – ➕ neue Sessions, die nur in Plan B sind\n"
-            "   – ➖ entfallene Sessions, die nur in Plan A sind\n"
-            "   – ✅ unveränderte Sessions\n"
-            "   – Δ Workload pro Trainer (Stunden/Woche)\n"
+            "**Pläne vergleichen** (Reiter *Pläne -> Vergleichen*):\n"
+            "- Wähle zwei Pläne (z.B. alter aktiver Plan vs. neue Variante).\n"
+            "- Du siehst:\n"
+            "   + neue Sessions, die nur in Plan B sind\n"
+            "   - entfallene Sessions, die nur in Plan A sind\n"
+            "   = unveränderte Sessions\n"
+            "   D Workload pro Trainer (Stunden/Woche)\n"
             "Hilfreich vor dem Aktivieren: prüfen, was sich für die Spieler ändert."
         ),
     ),
@@ -192,12 +192,12 @@ KNOWLEDGE: list[Topic] = [
         answer=(
             "Der **Score** ist die Zielfunktion des Solvers. Höher = besser.\n"
             "Er setzt sich zusammen aus:\n"
-            "• **+ erfüllte Trainerwünsche** der Spieler\n"
-            "• **+ erfüllte Mitspieler-Wünsche**\n"
-            "• **+ minimale Platzwechsel** (zusammenhängende Blocks)\n"
-            "• **+ erfüllte Mindest-/Wunsch-Stundenzahl der Spieler**\n\n"
-            "Der Plan mit dem höchsten Score wird in der Liste als **„bester "
-            "Plan"** markiert."
+            "- erfüllte Trainerwünsche der Spieler\n"
+            "- erfüllte Mitspieler-Wünsche\n"
+            "- minimale Platzwechsel (zusammenhängende Blocks)\n"
+            "- erfüllte Mindest-/Wunsch-Stundenzahl der Spieler\n\n"
+            "Der Plan mit dem höchsten Score wird in der Liste als "
+            "**bester Plan** markiert."
         ),
     ),
     Topic(
@@ -207,7 +207,7 @@ KNOWLEDGE: list[Topic] = [
             "Ein Plan ist erst nach **Aktivieren** der gültige Wochenplan. "
             "In der Plan-Liste (Reiter *Pläne*): Klick auf den Plan, dann "
             "**Aktivieren**. Es kann pro Saison nur ein aktiver Plan "
-            "gleichzeitig existieren — der vorherige wird automatisch "
+            "gleichzeitig existieren - der vorherige wird automatisch "
             "deaktiviert (bleibt aber als Historie erhalten)."
         ),
     ),
@@ -215,12 +215,12 @@ KNOWLEDGE: list[Topic] = [
         title="Plan-Detailansicht",
         keywords={"plan detail", "plandetail", "plan ansehen", "plan öffnen", "plan oeffnen", "wochenplan"},
         answer=(
-            "Klick auf einen Plan in der Liste → **Detailansicht** "
+            "Klick auf einen Plan in der Liste -> **Detailansicht** "
             "(`/plans/{id}`). Du siehst:\n"
-            "• Wochenraster mit allen Sessions (Mo–So × 06:00–21:00)\n"
-            "• Pro Session: Trainer, Spieler, Platz, Dauer\n"
-            "• Kennzahlen: Score, Anzahl Sessions, Auslastung pro Trainer\n"
-            "• Buttons: Aktivieren, Vergleich starten, Export"
+            "- Wochenraster mit allen Sessions (Mo-So x 06:00-21:00)\n"
+            "- Pro Session: Trainer, Spieler, Platz, Dauer\n"
+            "- Kennzahlen: Score, Anzahl Sessions, Auslastung pro Trainer\n"
+            "- Buttons: Aktivieren, Vergleich starten, Export"
         ),
     ),
 
@@ -234,15 +234,15 @@ KNOWLEDGE: list[Topic] = [
             "Wochenpläne den mit höchstem Score, der **alle harten "
             "Constraints** erfüllt.\n\n"
             "**Harte Constraints** (müssen erfüllt sein):\n"
-            "• Verfügbarkeit Trainer/Spieler/Platz\n"
-            "• Gruppengrößen (`max_group_size`)\n"
-            "• Mindest-Block-Länge (zusammenhängende Slots)\n"
-            "• Max. Stunden/Tag und /Woche pro Trainer und Spieler\n"
-            "• Akzeptierte LK & Altersgruppen des Trainers\n\n"
+            "- Verfügbarkeit Trainer/Spieler/Platz\n"
+            "- Gruppengrößen (`max_group_size`)\n"
+            "- Mindest-Block-Länge (zusammenhängende Slots)\n"
+            "- Max. Stunden/Tag und /Woche pro Trainer und Spieler\n"
+            "- Akzeptierte LK & Altersgruppen des Trainers\n\n"
             "**Soft-Objektive** (zu maximieren):\n"
-            "• erfüllte Trainer- und Mitspieler-Wünsche\n"
-            "• wenig Platzwechsel\n"
-            "• Mindest-/Wunschstunden der Spieler erreichen"
+            "- erfüllte Trainer- und Mitspieler-Wünsche\n"
+            "- wenig Platzwechsel\n"
+            "- Mindest-/Wunschstunden der Spieler erreichen"
         ),
     ),
     Topic(
@@ -264,15 +264,15 @@ KNOWLEDGE: list[Topic] = [
         title="Plan leer / infeasible",
         keywords={"infeasible", "leer", "keine sessions", "kein plan", "warum keine", "solver findet nichts", "unmöglich", "unmoeglich"},
         answer=(
-            "Wenn der Solver einen leeren oder „infeasible" Plan meldet, sind "
+            "Wenn der Solver einen leeren oder 'infeasible' Plan meldet, sind "
             "die harten Constraints widersprüchlich. Häufige Ursachen:\n\n"
-            "1. **Zu wenig Verfügbarkeit** — Trainer/Spieler/Platz haben "
+            "1. **Zu wenig Verfügbarkeit** - Trainer/Spieler/Platz haben "
             "kein gemeinsames Zeitfenster.\n"
-            "2. **LK-Lücke** — kein Trainer akzeptiert die LK-Stufen der "
+            "2. **LK-Lücke** - kein Trainer akzeptiert die LK-Stufen der "
             "Spieler.\n"
-            "3. **Min-Stunden zu hoch** — Spieler verlangen mehr Stunden, "
+            "3. **Min-Stunden zu hoch** - Spieler verlangen mehr Stunden, "
             "als zusammen passen.\n"
-            "4. **Plätze zu knapp** — zu wenige Courts für die Slot-Zahl.\n\n"
+            "4. **Plätze zu knapp** - zu wenige Courts für die Slot-Zahl.\n\n"
             "Lösung: Reiter *Verfügbarkeiten* öffnen, Lücken füllen, "
             "Min-Stunden senken oder zusätzlichen Platz/Trainer anlegen."
         ),
@@ -282,9 +282,9 @@ KNOWLEDGE: list[Topic] = [
         keywords={"solver dauert", "solver langsam", "wie lange", "laufzeit", "rechenzeit", "timeout"},
         answer=(
             "Typische Solver-Laufzeit:\n"
-            "• Kleine Vereine (≤10 Trainer, ≤30 Spieler): **<10 Sekunden**.\n"
-            "• Mittelgroß (≤20 Trainer, ≤80 Spieler): **30–120 Sekunden**.\n"
-            "• Groß (≥30 Trainer, ≥150 Spieler): **2–10 Minuten**.\n\n"
+            "- Kleine Vereine (<=10 Trainer, <=30 Spieler): **<10 Sekunden**.\n"
+            "- Mittelgroß (<=20 Trainer, <=80 Spieler): **30-120 Sekunden**.\n"
+            "- Groß (>=30 Trainer, >=150 Spieler): **2-10 Minuten**.\n\n"
             "Der Solver läuft im **Worker-Container** (asynchron), die UI "
             "blockiert nicht. Bei harter Zeitbegrenzung liefert der Solver "
             "die beste bisher gefundene Lösung."
@@ -297,20 +297,20 @@ KNOWLEDGE: list[Topic] = [
         keywords={"rolle", "rollen", "rechte", "berechtigung", "wer darf", "role", "permission", "permissions"},
         answer=(
             "Es gibt drei Rollen:\n\n"
-            "**👑 Admin** — voller Zugriff:\n"
-            "• Benutzer anlegen/bearbeiten/löschen\n"
-            "• Trainer & Spieler-Stammdaten verwalten\n"
-            "• Saisons, Plätze, Pläne anlegen, Solver starten\n"
-            "• Als einzige Rolle Profile *aller* Personen ändern\n\n"
-            "**🎾 Trainer (Coach)**\n"
-            "• Eigenes Profil + Verfügbarkeit ändern\n"
-            "• Spieler-Liste sehen, **LK aller Spieler** anpassen\n"
-            "• Eigene Sessions im Plan sehen\n\n"
-            "**🏃 Spieler (Player)**\n"
-            "• Eigenes Profil + Verfügbarkeit ändern\n"
-            "• Wunschtrainer + Wunsch-Mitspieler eintragen\n"
-            "• Eigene Sessions im Plan sehen\n"
-            "• Kann LK *nicht* selbst setzen, nicht „Trainer" werden"
+            "**Admin** - voller Zugriff:\n"
+            "- Benutzer anlegen/bearbeiten/löschen\n"
+            "- Trainer & Spieler-Stammdaten verwalten\n"
+            "- Saisons, Plätze, Pläne anlegen, Solver starten\n"
+            "- Als einzige Rolle Profile *aller* Personen ändern\n\n"
+            "**Trainer (Coach)**\n"
+            "- Eigenes Profil + Verfügbarkeit ändern\n"
+            "- Spieler-Liste sehen, **LK aller Spieler** anpassen\n"
+            "- Eigene Sessions im Plan sehen\n\n"
+            "**Spieler (Player)**\n"
+            "- Eigenes Profil + Verfügbarkeit ändern\n"
+            "- Wunschtrainer + Wunsch-Mitspieler eintragen\n"
+            "- Eigene Sessions im Plan sehen\n"
+            "- Kann LK *nicht* selbst setzen, nicht 'Trainer' werden"
         ),
     ),
     Topic(
@@ -318,12 +318,12 @@ KNOWLEDGE: list[Topic] = [
         keywords={"trainer anlegen", "neuer trainer", "coach anlegen", "trainer erstellen", "trainer hinzufügen", "trainer hinzufuegen"},
         answer=(
             "**Neuen Trainer anlegen** (nur Admin):\n"
-            "1. Reiter *Benutzer → Neuen Benutzer anlegen*.\n"
+            "1. Reiter *Benutzer -> Neuen Benutzer anlegen*.\n"
             "2. E-Mail + Initial-Passwort eingeben.\n"
-            "3. Rolle = **Trainer** wählen → der Trainer-Datensatz wird "
+            "3. Rolle = **Trainer** wählen -> der Trainer-Datensatz wird "
             "automatisch verlinkt.\n"
             "4. Der Trainer loggt sich ein und füllt unter "
-            "*Trainer → Mein Profil* aus: Verfügbarkeit, "
+            "*Trainer -> Mein Profil* aus: Verfügbarkeit, "
             "max. Stunden/Tag und /Woche, akzeptierte LK-Stufen, "
             "akzeptierter Altersbereich, Mindest-Block-Länge.\n\n"
             "Ohne Profil-Daten plant der Solver **keine Sessions** für diesen "
@@ -335,10 +335,10 @@ KNOWLEDGE: list[Topic] = [
         keywords={"spieler anlegen", "neuer spieler", "schüler anlegen", "schueler anlegen", "spieler erstellen", "spieler hinzufügen", "spieler hinzufuegen"},
         answer=(
             "**Neuen Spieler anlegen** (nur Admin):\n"
-            "1. Reiter *Benutzer → Neuen Benutzer anlegen*.\n"
+            "1. Reiter *Benutzer -> Neuen Benutzer anlegen*.\n"
             "2. E-Mail + Initial-Passwort eingeben.\n"
             "3. Rolle = **Spieler** wählen.\n"
-            "4. Der Spieler loggt sich ein und füllt unter *Spieler → Mein "
+            "4. Der Spieler loggt sich ein und füllt unter *Spieler -> Mein "
             "Profil* aus: Verfügbarkeit, Stunden/Woche (min/max/wunsch), "
             "Wunschtrainer, Wunsch-Mitspieler, Alter.\n"
             "5. Ein Trainer setzt anschließend in der Spieler-Liste die LK."
@@ -350,7 +350,7 @@ KNOWLEDGE: list[Topic] = [
         answer=(
             "**Benutzer entfernen** (nur Admin):\n"
             "1. Reiter *Benutzer*\n"
-            "2. Zeile öffnen → **Löschen** (oder Häkchen *aktiv* entfernen, "
+            "2. Zeile öffnen -> **Löschen** (oder Häkchen *aktiv* entfernen, "
             "wenn der Account erhalten bleiben soll).\n\n"
             "Bei einer Löschung bleiben historische Plan-Daten anonymisiert "
             "erhalten (Foreign Keys werden auf NULL gesetzt). Wenn der User "
@@ -362,11 +362,11 @@ KNOWLEDGE: list[Topic] = [
         keywords={"passwort", "password", "kennwort", "vergessen", "reset"},
         answer=(
             "**Passwort-Änderung**:\n"
-            "• Aktuell setzt ein **Admin** das Passwort über "
-            "*Benutzer → Bearbeiten → neues Passwort*.\n"
-            "• Eine Self-Service-Funktion (Spieler/Trainer ändern selbst) "
+            "- Aktuell setzt ein **Admin** das Passwort über "
+            "*Benutzer -> Bearbeiten -> neues Passwort*.\n"
+            "- Eine Self-Service-Funktion (Spieler/Trainer ändern selbst) "
             "ist noch nicht eingebaut.\n"
-            "• Ein **vergessenes Passwort** muss aktuell vom Admin "
+            "- Ein **vergessenes Passwort** muss aktuell vom Admin "
             "zurückgesetzt werden.\n\n"
             "Tipp: bei der ersten Anmeldung ein langes, einmaliges "
             "Initial-Passwort vergeben."
@@ -387,7 +387,7 @@ KNOWLEDGE: list[Topic] = [
         keywords={"logout", "abmelden", "ausloggen", "sign out"},
         answer=(
             "**Abmelden**: oben rechts in der Navigation auf den eigenen "
-            "Namen → *Abmelden*. Das löscht JWT und Rollen-Cache; danach "
+            "Namen -> *Abmelden*. Das löscht JWT und Rollen-Cache; danach "
             "wirst du auf den Login zurückgeleitet."
         ),
     ),
@@ -398,10 +398,10 @@ KNOWLEDGE: list[Topic] = [
         keywords={"reiter pläne", "tab pläne", "pläne seite", "plansseite", "plans page", "/plaene"},
         answer=(
             "Reiter **Pläne** hat drei Unterreiter:\n"
-            "• **Liste** — alle Pläne, sortiert nach Score; aktiver Plan ist "
+            "- **Liste** - alle Pläne, sortiert nach Score; aktiver Plan ist "
             "markiert.\n"
-            "• **Vergleichen** — zwei Pläne nebeneinander.\n"
-            "• **Saisonwechsel** — Wizard zum Erzeugen neuer Plan-Varianten."
+            "- **Vergleichen** - zwei Pläne nebeneinander.\n"
+            "- **Saisonwechsel** - Wizard zum Erzeugen neuer Plan-Varianten."
         ),
     ),
     Topic(
@@ -409,12 +409,12 @@ KNOWLEDGE: list[Topic] = [
         keywords={"reiter trainer", "trainer seite", "trainer-seite", "/trainer", "coach page"},
         answer=(
             "Reiter **Trainer** hat drei Unterreiter:\n"
-            "• **Liste** — Tabelle aller Trainer mit max. Gruppengröße, "
+            "- **Liste** - Tabelle aller Trainer mit max. Gruppengröße, "
             "akzeptierter LK-Bereich, akzeptierter Altersbereich, max. "
             "Stunden/Tag und /Woche, Verfügbarkeits-Stunden.\n"
-            "• **Mein Profil** — der eingeloggte Trainer bearbeitet eigene "
+            "- **Mein Profil** - der eingeloggte Trainer bearbeitet eigene "
             "Daten + Verfügbarkeit.\n"
-            "• **Bulk-Editor** (Admin) — mehrere Trainer auf einmal pflegen."
+            "- **Bulk-Editor** (Admin) - mehrere Trainer auf einmal pflegen."
         ),
     ),
     Topic(
@@ -422,9 +422,9 @@ KNOWLEDGE: list[Topic] = [
         keywords={"reiter spieler", "spieler seite", "/spieler", "player page", "schüler seite", "schueler seite"},
         answer=(
             "Reiter **Spieler** hat zwei Unterreiter:\n"
-            "• **Liste** — Tabelle aller Spieler. Trainer können hier die "
+            "- **Liste** - Tabelle aller Spieler. Trainer können hier die "
             "**LK** inline anpassen.\n"
-            "• **Mein Profil** — der eingeloggte Spieler bearbeitet eigene "
+            "- **Mein Profil** - der eingeloggte Spieler bearbeitet eigene "
             "Daten + Verfügbarkeit + Wunschtrainer/-Mitspieler."
         ),
     ),
@@ -443,11 +443,11 @@ KNOWLEDGE: list[Topic] = [
         keywords={"reiter benutzer", "benutzer-verwaltung", "benutzerverwaltung", "/admin/users", "users admin", "user management"},
         answer=(
             "Reiter **Benutzer** (nur Admin):\n"
-            "• Liste aller Konten mit E-Mail, Rolle, aktiv-Status\n"
-            "• Anlegen neuer User mit Initial-Passwort\n"
-            "• Rolle ändern (Admin/Trainer/Spieler) — ein verlinkter "
+            "- Liste aller Konten mit E-Mail, Rolle, aktiv-Status\n"
+            "- Anlegen neuer User mit Initial-Passwort\n"
+            "- Rolle ändern (Admin/Trainer/Spieler) - ein verlinkter "
             "Trainer-/Spieler-Datensatz wird automatisch erzeugt\n"
-            "• Passwort zurücksetzen, Account deaktivieren/löschen"
+            "- Passwort zurücksetzen, Account deaktivieren/löschen"
         ),
     ),
 
@@ -457,10 +457,10 @@ KNOWLEDGE: list[Topic] = [
         keywords={"mein profil", "eigenes profil", "profil bearbeiten", "profil ändern", "profil aendern", "my profile"},
         answer=(
             "**Mein Profil** findet sich:\n"
-            "• Trainer: Reiter *Trainer → Mein Profil*\n"
-            "• Spieler: Reiter *Spieler → Mein Profil*\n\n"
+            "- Trainer: Reiter *Trainer -> Mein Profil*\n"
+            "- Spieler: Reiter *Spieler -> Mein Profil*\n\n"
             "Hier änderst du Verfügbarkeit, Wunschdaten, Stunden-Limits. "
-            "Andere Profile dürfen Trainer/Spieler **nicht** ändern — nur "
+            "Andere Profile dürfen Trainer/Spieler **nicht** ändern - nur "
             "der Admin kann das. Trainer dürfen bei allen Spielern "
             "**die LK** in der Spielerliste setzen."
         ),
@@ -470,10 +470,10 @@ KNOWLEDGE: list[Topic] = [
         keywords={"verfügbar", "verfuegbar", "availability", "zeit eintragen", "zeitfenster", "zeiten", "kalender"},
         answer=(
             "**Verfügbarkeit eintragen**:\n"
-            "• Spieler: *Spieler → Mein Profil* → Wochenraster.\n"
-            "• Trainer: *Trainer → Mein Profil* → Wochenraster.\n"
-            "• Plätze (Admin): *Verfügbarkeiten*.\n\n"
-            "Das Raster zeigt Mo–So × 06:00–21:00 in 30-Min-Schritten. "
+            "- Spieler: *Spieler -> Mein Profil* -> Wochenraster.\n"
+            "- Trainer: *Trainer -> Mein Profil* -> Wochenraster.\n"
+            "- Plätze (Admin): *Verfügbarkeiten*.\n\n"
+            "Das Raster zeigt Mo-So x 06:00-21:00 in 30-Min-Schritten. "
             "**Klicke und ziehe**, um ein Zeitfenster zu markieren oder zu "
             "löschen. Grün = verfügbar, leer = nicht verfügbar."
         ),
@@ -484,7 +484,7 @@ KNOWLEDGE: list[Topic] = [
         answer=(
             "Im Spieler-Profil können bis zu 3 **Wunschtrainer** angegeben "
             "werden. Der Solver versucht im Score, diese Wünsche zu "
-            "erfüllen — es ist aber kein Muss. Wunschtrainer haben Vorrang "
+            "erfüllen - es ist aber kein Muss. Wunschtrainer haben Vorrang "
             "vor anderen Trainer-Soft-Constraints."
         ),
     ),
@@ -492,9 +492,9 @@ KNOWLEDGE: list[Topic] = [
         title="Wunsch-Mitspieler",
         keywords={"mitspieler", "lieblingspartner", "wunsch mitspieler", "wunschpartner", "preferred partner", "preferred player"},
         answer=(
-            "Spieler können **Wunsch-Mitspieler** angeben (z.B. „spiele am "
-            "liebsten mit Anna und Ben"). Der Solver erhält Pluspunkte, "
-            "wenn er diese Spieler in dieselbe Session steckt — Voraussetzung: "
+            "Spieler können **Wunsch-Mitspieler** angeben (z.B. 'spiele am "
+            "liebsten mit Anna und Ben'). Der Solver erhält Pluspunkte, "
+            "wenn er diese Spieler in dieselbe Session steckt - Voraussetzung: "
             "ähnliche LK und überlappende Verfügbarkeit."
         ),
     ),
@@ -503,11 +503,11 @@ KNOWLEDGE: list[Topic] = [
         keywords={"stunden pro woche", "min slots", "max slots", "wunschstunden", "wunsch stunden", "trainingsstunden"},
         answer=(
             "Spieler tragen drei Werte ein:\n"
-            "• **Min. Stunden/Woche** — harter Constraint, wird nie "
+            "- **Min. Stunden/Woche** - harter Constraint, wird nie "
             "unterschritten.\n"
-            "• **Max. Stunden/Woche** — harter Constraint, wird nie "
+            "- **Max. Stunden/Woche** - harter Constraint, wird nie "
             "überschritten.\n"
-            "• **Wunsch-Stunden/Woche** — Soft-Constraint, fließt in den "
+            "- **Wunsch-Stunden/Woche** - Soft-Constraint, fließt in den "
             "Score ein.\n\n"
             "Trainer haben zusätzlich **max. Stunden/Tag** und "
             "**max. Stunden/Woche**."
@@ -529,11 +529,11 @@ KNOWLEDGE: list[Topic] = [
         keywords={"accepts_lk", "accepts_age", "akzeptierte lk", "akzeptiertes alter", "altersgruppe trainer", "lk-bereich"},
         answer=(
             "Im Trainer-Profil:\n"
-            "• `accepts_lk_min` / `accepts_lk_max` — der Trainer trainiert "
+            "- `accepts_lk_min` / `accepts_lk_max` - der Trainer trainiert "
             "nur Spieler in diesem LK-Bereich.\n"
-            "• `accepts_age_min` / `accepts_age_max` — analog für das Alter.\n\n"
+            "- `accepts_age_min` / `accepts_age_max` - analog für das Alter.\n\n"
             "Lässt du ein Feld **leer**, gilt **kein Limit** in dieser "
-            "Richtung (z.B. nur `accepts_lk_max=12` → der Trainer nimmt "
+            "Richtung (z.B. nur `accepts_lk_max=12` -> der Trainer nimmt "
             "alles ab Profi bis LK 12, aber nichts Schwächeres)."
         ),
     ),
@@ -545,7 +545,7 @@ KNOWLEDGE: list[Topic] = [
         answer=(
             "**Plätze** verwalten (Admin): Reiter *Verfügbarkeiten* zeigt "
             "Platz-Verfügbarkeiten. Anlage neuer Plätze aktuell nur per "
-            "API (`POST /api/courts`) — dort: Name, Indoor (true/false), "
+            "API (`POST /api/courts`) - dort: Name, Indoor (true/false), "
             "Verfügbarkeit. Der Solver weist jeder Session einen Platz zu "
             "und minimiert Wechsel zwischen Plätzen pro Spieler."
         ),
@@ -558,9 +558,9 @@ KNOWLEDGE: list[Topic] = [
         answer=(
             "Unten rechts findest du das **Chat-Dock**. Es ist ein "
             "regelbasierter Bot (kein LLM), der über Stichworte arbeitet. "
-            "Du kannst nach Daten fragen („Welche Trainer haben wir?"), nach "
-            "Erklärungen („Was ist der Solver?") oder nach Workflow-Hilfe "
-            "(„Wie lege ich einen Spieler an?"). Tippe **hilfe** für die "
+            "Du kannst nach Daten fragen ('Welche Trainer haben wir?'), nach "
+            "Erklärungen ('Was ist der Solver?') oder nach Workflow-Hilfe "
+            "('Wie lege ich einen Spieler an?'). Tippe **hilfe** für die "
             "volle Themenliste."
         ),
     ),
@@ -571,11 +571,11 @@ KNOWLEDGE: list[Topic] = [
         keywords={"dsgvo", "gdpr", "datenschutz", "datenexport", "daten exportieren", "export meiner daten"},
         answer=(
             "**DSGVO-Funktionen**:\n"
-            "• **Art. 15 (Auskunft)**: `GET /api/me/export` liefert alle "
+            "- **Art. 15 (Auskunft)**: `GET /api/me/export` liefert alle "
             "personenbezogenen Daten als JSON.\n"
-            "• **Art. 17 (Löschung)**: `DELETE /api/me` entfernt deinen "
+            "- **Art. 17 (Löschung)**: `DELETE /api/me` entfernt deinen "
             "Account; historische Plan-Daten werden anonymisiert.\n"
-            "• **Art. 20 (Datenübertragbarkeit)**: das JSON aus Art. 15 ist "
+            "- **Art. 20 (Datenübertragbarkeit)**: das JSON aus Art. 15 ist "
             "maschinenlesbar.\n\n"
             "Datenschutz-Verantwortliche*r für die Installation ist der "
             "Vereins-Admin."
@@ -587,47 +587,28 @@ KNOWLEDGE: list[Topic] = [
         title="Backup",
         keywords={"backup", "sicherung", "datensicherung", "restore", "wiederherstellen"},
         answer=(
-            "**Backup** (siehe `docs/SETUP.md` Abschnitt 10):\n"
-            "PowerShell im Repo-Ordner:\n"
-            "```\n"
-            "docker compose --env-file .env -f deploy/docker-compose.yml `\n"
-            "  exec db pg_dump -U coach coach_assistant > backup-2026-05-20.sql\n"
-            "```\n"
-            "Die SQL-Datei sicherst du auf einem externen Medium (USB, "
-            "Cloud-Speicher). **Wiederherstellen**:\n"
-            "```\n"
-            "Get-Content backup-2026-05-20.sql | docker compose --env-file `\n"
-            "  .env -f deploy/docker-compose.yml exec -T db psql -U coach `\n"
-            "  -d coach_assistant\n"
-            "```\n"
-            "Empfehlung: tägliches automatisches Backup per Aufgabenplanung."
+            "**Backup** (siehe `docs/SETUP.md` Abschnitt 10): "
+            "`pg_dump` im db-Container, Output als SQL-Datei sichern. "
+            "Wiederherstellen: `psql` mit der SQL-Datei. Empfehlung: "
+            "tägliches automatisches Backup per Aufgabenplanung."
         ),
     ),
     Topic(
         title="Update / git pull",
         keywords={"update", "aktualisier", "neue version", "git pull", "upgraden", "upgrade"},
         answer=(
-            "**Update** auf neue Version:\n"
-            "```\n"
-            "cd C:\\Git_Repos\\coach_assistant\n"
-            "git pull\n"
-            "docker compose --env-file .env -f deploy/docker-compose.yml `\n"
-            "  up -d --build api web worker\n"
-            "```\n"
+            "**Update**: `git pull`, dann `docker compose --env-file .env "
+            "-f deploy/docker-compose.yml up -d --build api web worker`. "
             "Datenbank-Migrationen laufen automatisch beim API-Start "
-            "(Alembic). Dauer: 1–3 Minuten."
+            "(Alembic). Dauer: 1-3 Minuten."
         ),
     ),
     Topic(
         title="Container neustarten",
         keywords={"neustart", "restart", "container starten", "container stoppen", "down", "up -d"},
         answer=(
-            "**Alles stoppen**: `docker compose --env-file .env -f "
-            "deploy/docker-compose.yml down`\n"
-            "**Alles starten**: `docker compose --env-file .env -f "
-            "deploy/docker-compose.yml up -d`\n"
-            "**Einzelnen Service neustarten** (z.B. nur API): "
-            "`... restart api`\n\n"
+            "**Alles stoppen**: `... down`. **Alles starten**: `... up -d`. "
+            "**Einzelnen Service neustarten** (z.B. nur API): `... restart api`. "
             "Status: `... ps`. Logs: `... logs -f api`."
         ),
     ),
@@ -635,13 +616,10 @@ KNOWLEDGE: list[Topic] = [
         title="Logs ansehen",
         keywords={"logs", "log", "fehlermeldung suchen", "logfile"},
         answer=(
-            "**Logs eines Services** (z.B. API):\n"
-            "```\n"
-            "docker compose --env-file .env -f deploy/docker-compose.yml `\n"
-            "  logs -f api\n"
-            "```\n"
-            "Andere Services: `web`, `worker`, `db`, `caddy`, `cloudflared`. "
-            "Mit `--tail 100` siehst du nur die letzten 100 Zeilen."
+            "**Logs eines Services** (z.B. API): "
+            "`docker compose --env-file .env -f deploy/docker-compose.yml "
+            "logs -f api`. Andere Services: `web`, `worker`, `db`, `caddy`, "
+            "`cloudflared`. Mit `--tail 100` siehst du nur die letzten 100 Zeilen."
         ),
     ),
     Topic(
@@ -650,13 +628,9 @@ KNOWLEDGE: list[Topic] = [
         answer=(
             "Die App wird über einen **Cloudflare Tunnel** öffentlich "
             "erreichbar (Details: `docs/SETUP.md` Abschnitt 7). Zwei "
-            "Varianten:\n"
-            "• **A) eigene Domain** — `https://coach.dein-verein.de`, "
-            "~10 €/Jahr.\n"
-            "• **B) Quick Tunnel** — `https://coach-xyz.trycloudflare.com`, "
-            "kostenlos.\n\n"
-            "HTTPS-Zertifikat besorgt Cloudflare automatisch. Kein offener "
-            "Port am Router nötig."
+            "Varianten: A) eigene Domain (~10 EUR/Jahr) oder B) Quick Tunnel "
+            "(kostenlos, `trycloudflare.com`-URL). HTTPS-Zertifikat besorgt "
+            "Cloudflare automatisch. Kein offener Port am Router nötig."
         ),
     ),
     Topic(
@@ -664,14 +638,14 @@ KNOWLEDGE: list[Topic] = [
         keywords={"architektur", "stack", "tech", "technologie", "framework", "wie ist das gebaut"},
         answer=(
             "**Tech-Stack**:\n"
-            "• Backend: Python 3.12, FastAPI, SQLAlchemy 2 (async), "
+            "- Backend: Python 3.12, FastAPI, SQLAlchemy 2 (async), "
             "PostgreSQL 16, Alembic, fastapi-users (Argon2id+JWT).\n"
-            "• Solver: Google OR-Tools CP-SAT (im Worker-Container).\n"
-            "• Frontend: React 18, TypeScript, Vite, TanStack Query, "
+            "- Solver: Google OR-Tools CP-SAT (im Worker-Container).\n"
+            "- Frontend: React 18, TypeScript, Vite, TanStack Query, "
             "react-router-dom.\n"
-            "• Deployment: Docker Compose (db, redis, api, worker, web, "
+            "- Deployment: Docker Compose (db, redis, api, worker, web, "
             "caddy, cloudflared).\n"
-            "• Architektur: hexagonal (domain / application / infrastructure "
+            "- Architektur: hexagonal (domain / application / infrastructure "
             "/ interfaces). Lizenz: AGPL-3.0."
         ),
     ),
@@ -679,10 +653,9 @@ KNOWLEDGE: list[Topic] = [
         title="API-Doku",
         keywords={"api", "openapi", "swagger", "/docs", "rest api", "endpoint"},
         answer=(
-            "Die REST-API ist unter **`/api/docs`** als Swagger-UI dokumentiert "
-            "(z.B. `https://coach.dein-verein.de/api/docs`). Dort findest du "
-            "alle Endpoints, kannst sie ausprobieren und das OpenAPI-JSON "
-            "unter `/api/openapi.json` herunterladen."
+            "Die REST-API ist unter **`/api/docs`** als Swagger-UI dokumentiert. "
+            "Dort findest du alle Endpoints, kannst sie ausprobieren und das "
+            "OpenAPI-JSON unter `/api/openapi.json` herunterladen."
         ),
     ),
 
@@ -702,10 +675,10 @@ KNOWLEDGE: list[Topic] = [
         keywords={"fehler", "error", "geht nicht", "funktioniert nicht", "kaputt", "bug", "problem"},
         answer=(
             "Allgemeine Vorgehensweise bei Problemen:\n"
-            "1. **Logs ansehen** — `... logs -f api` oder `... logs -f web`.\n"
-            "2. **Container-Status** — `... ps` (alle `running`?).\n"
-            "3. **Browser-Cache leeren** — Strg+F5.\n"
-            "4. **Container neustarten** — `... restart api`.\n"
+            "1. **Logs ansehen** - `... logs -f api` oder `... logs -f web`.\n"
+            "2. **Container-Status** - `... ps` (alle `running`?).\n"
+            "3. **Browser-Cache leeren** - Strg+F5.\n"
+            "4. **Container neustarten** - `... restart api`.\n"
             "5. **Frage konkretisieren**: Welche Seite? Welcher Knopf? "
             "Welche Fehlermeldung?\n\n"
             "Mehr unter `docs/SETUP.md` Abschnitt 11."
@@ -716,7 +689,7 @@ KNOWLEDGE: list[Topic] = [
     Topic(
         title="Dank",
         keywords={"danke", "thanks", "thank you", "merci", "vielen dank"},
-        answer="Gerne! Wenn du noch Fragen hast — tippe **hilfe** für die Themenliste.",
+        answer="Gerne! Wenn du noch Fragen hast - tippe **hilfe** für die Themenliste.",
     ),
 ]
 
@@ -730,7 +703,7 @@ async def _list_coaches(_text: str, db: AsyncSession) -> str:
         return "Es sind aktuell keine Trainer angelegt."
     lines = [f"**{len(rows)} Trainer**:"]
     for c in rows:
-        lines.append(f"• {c.name} (max. Gruppengröße {c.max_group_size})")
+        lines.append(f"- {c.name} (max. Gruppengröße {c.max_group_size})")
     return "\n".join(lines)
 
 
@@ -748,8 +721,8 @@ async def _list_players(_text: str, db: AsyncSession) -> str:
             extras.append(f"LK {lk}")
         if age is not None:
             extras.append(f"{age} J.")
-        extras.append(f"{p.min_slots_per_week}–{p.max_slots_per_week} Std/W")
-        lines.append(f"• {p.name} ({', '.join(extras)})")
+        extras.append(f"{p.min_slots_per_week}-{p.max_slots_per_week} Std/W")
+        lines.append(f"- {p.name} ({', '.join(extras)})")
     return "\n".join(lines)
 
 
@@ -760,7 +733,7 @@ async def _list_courts(_text: str, db: AsyncSession) -> str:
     lines = [f"**{len(rows)} Plätze**:"]
     for c in rows:
         kind = "Halle" if c.indoor else "Outdoor"
-        lines.append(f"• {c.name} ({kind})")
+        lines.append(f"- {c.name} ({kind})")
     return "\n".join(lines)
 
 
@@ -770,7 +743,7 @@ async def _list_seasons(_text: str, db: AsyncSession) -> str:
         return "Es sind aktuell keine Saisons angelegt."
     lines = [f"**{len(rows)} Saisons**:"]
     for s in rows:
-        lines.append(f"• {s.name} ({s.valid_from} – {s.valid_to})")
+        lines.append(f"- {s.name} ({s.valid_from} - {s.valid_to})")
     return "\n".join(lines)
 
 
@@ -778,15 +751,13 @@ async def _count_users(_text: str, db: AsyncSession) -> str:
     rows = (await db.execute(select(UserORM))).scalars().all()
     by_role: dict[str, int] = {}
     for u in rows:
-        # Role is a StrEnum on the ORM; coerce to str to keep dict keys
-        # uniform and sortable regardless of dialect.
         key = str(getattr(u.role, "value", u.role) or "unknown")
         by_role[key] = by_role.get(key, 0) + 1
     if not by_role:
         return "Keine Benutzer im System."
     lines = [f"**{len(rows)} Benutzer** insgesamt:"]
     for role, count in sorted(by_role.items()):
-        lines.append(f"• {role}: {count}")
+        lines.append(f"- {role}: {count}")
     return "\n".join(lines)
 
 
@@ -801,9 +772,9 @@ async def _list_plans(_text: str, db: AsyncSession) -> str:
         return "Es wurden noch keine Pläne generiert."
     lines = ["**Letzte Pläne** (max. 10):"]
     for plan, season in rows:
-        score = f"{plan.score:.1f}" if plan.score is not None else "—"
-        created = plan.created_at.strftime("%Y-%m-%d") if plan.created_at else "—"
-        lines.append(f"• {season.name} — Score {score} ({created})")
+        score = f"{plan.score:.1f}" if plan.score is not None else "-"
+        created = plan.created_at.strftime("%Y-%m-%d") if plan.created_at else "-"
+        lines.append(f"- {season.name} - Score {score} ({created})")
     return "\n".join(lines)
 
 
@@ -830,7 +801,6 @@ def _has_all_groups(text: str, groups: list[set[str]]) -> bool:
 
 
 def _topic_score(text: str, topic: Topic) -> int:
-    """Number of keyword hits — used to suggest related topics on fallback."""
     return sum(1 for kw in topic.keywords if kw in text)
 
 
@@ -845,10 +815,10 @@ HELP_FALLBACK_BASE = (
     "Das habe ich nicht ganz verstanden. Tippe **hilfe** für eine "
     "Übersicht aller Themen, die ich beantworten kann.\n\n"
     "Beispiele:\n"
-    "• „Welche Trainer haben wir?"\n"
-    "• „Wie funktioniert der Solver?"\n"
-    "• „Was bedeutet LK?"\n"
-    "• „Wie lege ich einen Spieler an?""
+    "- 'Welche Trainer haben wir?'\n"
+    "- 'Wie funktioniert der Solver?'\n"
+    "- 'Was bedeutet LK?'\n"
+    "- 'Wie lege ich einen Spieler an?'"
 )
 
 
@@ -856,7 +826,7 @@ def _fallback(text: str) -> str:
     suggestions = _suggest_topics(text)
     if not suggestions:
         return HELP_FALLBACK_BASE
-    bullet = "\n".join(f"• {title}" for title in suggestions)
+    bullet = "\n".join(f"- {title}" for title in suggestions)
     return (
         "Das habe ich nicht eindeutig erkannt. Meintest du eines dieser "
         f"Themen?\n\n{bullet}\n\n"
@@ -885,7 +855,7 @@ async def answer(message: str, db: AsyncSession) -> str:
             except Exception as exc:  # noqa: BLE001
                 return f"Datenbank-Fehler beim Beantworten: {exc}"
 
-    # 2. Static knowledge — first match wins
+    # 2. Static knowledge - first match wins
     for topic in KNOWLEDGE:
         if topic.requires and not _has_all_groups(lower, topic.requires):
             continue
@@ -895,8 +865,8 @@ async def answer(message: str, db: AsyncSession) -> str:
     # 3. Greetings
     if GREETING_RE.match(lower):
         return (
-            "Hallo! 👋 Ich bin der Coach-Assistent. Frage mich z.B. "
-            "„Welche Trainer haben wir?" oder tippe **hilfe**."
+            "Hallo! Ich bin der Coach-Assistent. Frage mich z.B. "
+            "'Welche Trainer haben wir?' oder tippe **hilfe**."
         )
 
     # 4. Suggestion-based fallback
