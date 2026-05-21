@@ -18,6 +18,7 @@ type ProfileResponse = {
       max_slots_per_day?: number | null;
       max_slots_per_week?: number | null;
       min_break_slots?: number;
+      max_break_slots?: number | null;
       accepts_lk_min?: number | null;
       accepts_lk_max?: number | null;
       accepts_age_min?: number | null;
@@ -47,6 +48,7 @@ export function CoachProfilePage() {
   const [maxDayH, setMaxDayH] = useState<number | null>(null);
   const [maxWeekH, setMaxWeekH] = useState<number | null>(null);
   const [minBreakH, setMinBreakH] = useState<number | null>(0);
+  const [maxBreakH, setMaxBreakH] = useState<number | null>(null);
   const [lkMin, setLkMin] = useState<number | null>(null);
   const [lkMax, setLkMax] = useState<number | null>(null);
   const [ageMin, setAgeMin] = useState<number | null>(null);
@@ -63,6 +65,7 @@ export function CoachProfilePage() {
       setMaxDayH(null);
       setMaxWeekH(null);
       setMinBreakH(0);
+      setMaxBreakH(null);
       setLkMin(null);
       setLkMax(null);
       setAgeMin(null);
@@ -77,6 +80,7 @@ export function CoachProfilePage() {
     setMaxDayH(hoursForSlots(k.max_slots_per_day ?? null));
     setMaxWeekH(hoursForSlots(k.max_slots_per_week ?? null));
     setMinBreakH(hoursForSlots(k.min_break_slots ?? 0) ?? 0);
+    setMaxBreakH(hoursForSlots(k.max_break_slots ?? null));
     setLkMin(k.accepts_lk_min ?? null);
     setLkMax(k.accepts_lk_max ?? null);
     setAgeMin(k.accepts_age_min ?? null);
@@ -96,6 +100,7 @@ export function CoachProfilePage() {
             max_slots_per_day: slotsForHours(maxDayH),
             max_slots_per_week: slotsForHours(maxWeekH),
             min_break_slots: slotsForHours(minBreakH ?? 0) ?? 0,
+            max_break_slots: slotsForHours(maxBreakH),
             accepts_lk_min: lkMin,
             accepts_lk_max: lkMax,
             accepts_age_min: ageMin,
@@ -203,6 +208,24 @@ export function CoachProfilePage() {
               max={24}
               step={0.5}
             />
+          </label>
+          <label style={{ width: 220 }}>
+            Max. Pause zwischen Blöcken (h)
+            <NumberField
+              value={maxBreakH}
+              onChange={setMaxBreakH}
+              min={0}
+              max={24}
+              step={0.5}
+              placeholder="kein Limit"
+            />
+            <span
+              className="muted"
+              style={{ fontSize: "var(--text-xs)", display: "block" }}
+            >
+              0 = Stunden müssen direkt aneinander anschließen, leer = kein
+              Limit
+            </span>
           </label>
         </div>
       </div>

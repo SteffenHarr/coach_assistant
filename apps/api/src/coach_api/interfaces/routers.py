@@ -597,10 +597,26 @@ def _coach_orm_to_dict(c: CoachORM) -> dict:
     }
 
 
-def _player_orm_to_dict(p: PlayerORM, *, include_level: bool = True) -> dict:
+def _player_orm_to_dict(
+    p: PlayerORM,
+    *,
+    include_level: bool = True,
+    include_preferences: bool = True,
+) -> dict:
+    """Serialize a PlayerORM row.
+
+    ``include_preferences=False`` strips ``preferred_coach_ids`` and
+    ``preferred_partner_ids`` from the output — used for player-facing
+    responses, since Wunschtrainer/Wunsch-Mitspieler are managed by
+    coaches/admins only and not visible to the player themselves.
+    Notes (free text) are *always* included.
+    """
     prefs = dict(p.preferences or {})
     if not include_level:
         prefs.pop("level_lk", None)
+    if not include_preferences:
+        prefs.pop("preferred_coach_ids", None)
+        prefs.pop("preferred_partner_ids", None)
     return {
         "id": str(p.id),
         "name": p.name,
@@ -628,10 +644,18 @@ async def get_my_profile(
     player_row = (
         await db.execute(select(PlayerORM).where(PlayerORM.user_id == user.id))
     ).scalar_one_or_none()
+    # Players do not see their own Wunschtrainer / Wunsch-Mitspieler — those
+    # are pflegbar only by coaches/admins (see /players/{id}/preferences).
+    hide_prefs = (
+        player_row is not None
+        and str(getattr(user.role, "value", user.role)) == UserRole.PLAYER.value
+    )
     return {
         "user": {"id": str(user.id), "email": user.email, "role": user.role},
         "coach": _coach_orm_to_dict(coach_row) if coach_row else None,
-        "player": _player_orm_to_dict(player_row) if player_row else None,
+        "player": _player_orm_to_dict(
+            player_row, include_preferences=not hide_prefs
+        ) if player_row else None,
     }
 
 
@@ -693,9 +717,17 @@ async def upsert_my_player_profile(
         row = PlayerORM(user_id=user.id, name=data.name or user.email.split("@")[0])
         db.add(row)
     incoming_prefs = data.preferences.model_dump(mode="json", exclude_none=False)
+    existing_prefs = dict(row.preferences or {})
     # Preserve any existing level_lk set by a coach.
-    existing_level = (row.preferences or {}).get("level_lk")
-    incoming_prefs["level_lk"] = existing_level
+    incoming_prefs["level_lk"] = existing_prefs.get("level_lk")
+    # Wunschtrainer / Wunsch-Mitspieler sind ausschließlich von Trainern/Admins
+    # pflegbar -> bestehende Werte beibehalten, eingehende Werte verwerfen.
+    incoming_prefs["preferred_coach_ids"] = existing_prefs.get(
+        "preferred_coach_ids", []
+    )
+    incoming_prefs["preferred_partner_ids"] = existing_prefs.get(
+        "preferred_partner_ids", []
+    )
 
     row.name = data.name
     row.availability = list(sorted(set(data.availability)))
@@ -705,7 +737,8 @@ async def upsert_my_player_profile(
     await db.commit()
     await db.refresh(row)
     await _audit(db, user, "update", "player_profile", str(row.id), {})
-    return _player_orm_to_dict(row)
+    hide_prefs = str(getattr(user.role, "value", user.role)) == UserRole.PLAYER.value
+    return _player_orm_to_dict(row, include_preferences=not hide_prefs)
 
 
 @router.patch("/players/{player_id}/level")
@@ -728,6 +761,62 @@ async def set_player_level(
     await db.commit()
     await _audit(db, user, "update", "player_level", str(player_id), {"level_lk": level})
     return {"id": str(row.id), "level_lk": level}
+
+
+@router.patch("/players/{player_id}/preferences")
+async def set_player_preferences(
+    player_id: UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: UserORM = Depends(require_role(UserRole.COACH, UserRole.ADMIN)),
+) -> dict:
+    """Coach/Admin endpoint: set a player's Wunschtrainer / Wunsch-Mitspieler.
+
+    Body: ``{"preferred_coach_ids": [uuid, ...], "preferred_partner_ids": [uuid, ...]}``.
+    Beide Felder sind optional; nicht gesendete Felder bleiben unverändert.
+    Spieler selbst dürfen das nicht."""
+    coach_ids = body.get("preferred_coach_ids")
+    partner_ids = body.get("preferred_partner_ids")
+
+    def _coerce(value: object, label: str) -> list[str]:
+        if not isinstance(value, list):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"{label} must be a list")
+        out: list[str] = []
+        for item in value:
+            try:
+                out.append(str(UUID(str(item))))
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(
+                    status.HTTP_400_BAD_REQUEST, f"{label} contains invalid UUID"
+                ) from exc
+        return out
+
+    row = await db.get(PlayerORM, player_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "player not found")
+    prefs = dict(row.preferences or {})
+    if coach_ids is not None:
+        prefs["preferred_coach_ids"] = _coerce(coach_ids, "preferred_coach_ids")
+    if partner_ids is not None:
+        prefs["preferred_partner_ids"] = _coerce(partner_ids, "preferred_partner_ids")
+    row.preferences = prefs
+    await db.commit()
+    await _audit(
+        db,
+        user,
+        "update",
+        "player_preferences",
+        str(player_id),
+        {
+            "preferred_coach_ids": prefs.get("preferred_coach_ids", []),
+            "preferred_partner_ids": prefs.get("preferred_partner_ids", []),
+        },
+    )
+    return {
+        "id": str(row.id),
+        "preferred_coach_ids": prefs.get("preferred_coach_ids", []),
+        "preferred_partner_ids": prefs.get("preferred_partner_ids", []),
+    }
 
 
 @router.get("/players/full")

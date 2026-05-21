@@ -71,6 +71,10 @@ class CoachConstraintsIn(BaseModel):
     max_slots_per_day: int | None = Field(None, ge=0, le=48)
     max_slots_per_week: int | None = Field(None, ge=0, le=336)
     min_break_slots: int = Field(0, ge=0, le=48)
+    # max. Pause zwischen zwei Blöcken am selben Tag (None = unbegrenzt,
+    # 0 = keine Pause erlaubt -> Rückenwind-Sessions sollen aneinander
+    # anschließen).
+    max_break_slots: int | None = Field(None, ge=0, le=48)
     # New (stored alongside in the same JSON column — solver currently ignores
     # these, they are metadata for human matching).
     accepts_lk_min: int | None = Field(None, ge=1, le=25)
@@ -112,6 +116,10 @@ class PlayerPreferencesIn(BaseModel):
     # Level on the German LK scale (1 = Profi, 25 = absolute Anfänger).
     # Only writable by coaches/admins (enforced in the route handler).
     level_lk: int | None = Field(None, ge=1, le=25)
+    # Freitext-Bemerkung des Spielers (vom Spieler selbst pflegbar, von
+    # Trainern lesbar). preferred_coach_ids / preferred_partner_ids sind
+    # ausschließlich von Trainern/Admins pflegbar (siehe Router).
+    notes: str = Field("", max_length=2000)
 
 
 class PlayerIn(BaseModel):

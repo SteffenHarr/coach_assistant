@@ -25,6 +25,7 @@ class CoachConstraints:
     max_slots_per_day: int | None = None
     max_slots_per_week: int | None = None
     min_break_slots: int = 0          # mind. Pause zwischen zwei Blöcken am selben Tag
+    max_break_slots: int | None = None  # max. Pause zwischen zwei Blöcken am selben Tag (None = unbegrenzt, 0 = keine Pause erlaubt)
     # Player-matching constraints (None = unrestricted on that side).
     accepts_lk_min: int | None = None     # smallest LK number = strongest player
     accepts_lk_max: int | None = None     # largest LK number = weakest player
@@ -48,6 +49,7 @@ class PlayerPreferences:
     allowed_session_types: frozenset[SessionType] = frozenset(
         {SessionType.SINGLE, SessionType.DOUBLE, SessionType.GROUP}
     )
+    notes: str = ""   # Freitext, vom Spieler gepflegt, von Trainern lesbar
 
 
 @dataclass(slots=True)

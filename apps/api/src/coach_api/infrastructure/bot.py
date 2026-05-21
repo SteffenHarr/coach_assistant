@@ -294,7 +294,12 @@ KNOWLEDGE: list[Topic] = [
     # ---------- Roles ----------
     Topic(
         title="Rollen-Übersicht",
-        keywords={"rolle", "rollen", "rechte", "berechtigung", "wer darf", "role", "permission", "permissions"},
+        keywords={
+            "rolle", "rollen", "rechte", "berechtigung", "berechtigungen",
+            "wer darf", "was darf", "darf der", "darf admin", "darf trainer",
+            "darf spieler", "rolle admin", "rolle trainer", "rolle spieler",
+            "role", "permission", "permissions",
+        },
         answer=(
             "Es gibt drei Rollen:\n\n"
             "**Admin** - voller Zugriff:\n"
@@ -315,7 +320,13 @@ KNOWLEDGE: list[Topic] = [
     ),
     Topic(
         title="Trainer anlegen",
-        keywords={"trainer anlegen", "neuer trainer", "coach anlegen", "trainer erstellen", "trainer hinzufügen", "trainer hinzufuegen"},
+        keywords={
+            "trainer anlegen", "neuer trainer", "coach anlegen",
+            "trainer erstellen", "trainer hinzufügen", "trainer hinzufuegen",
+            "trainer einrichten", "trainer aufnehmen", "trainer einladen",
+            "wie lege ich einen trainer", "wie erstelle ich einen trainer",
+            "neuen trainer",
+        },
         answer=(
             "**Neuen Trainer anlegen** (nur Admin):\n"
             "1. Reiter *Benutzer -> Neuen Benutzer anlegen*.\n"
@@ -332,7 +343,14 @@ KNOWLEDGE: list[Topic] = [
     ),
     Topic(
         title="Spieler anlegen",
-        keywords={"spieler anlegen", "neuer spieler", "schüler anlegen", "schueler anlegen", "spieler erstellen", "spieler hinzufügen", "spieler hinzufuegen"},
+        keywords={
+            "spieler anlegen", "neuer spieler", "schüler anlegen",
+            "schueler anlegen", "spieler erstellen",
+            "spieler hinzufügen", "spieler hinzufuegen",
+            "spieler einrichten", "spieler aufnehmen", "spieler einladen",
+            "wie lege ich einen spieler", "wie erstelle ich einen spieler",
+            "neuen spieler",
+        },
         answer=(
             "**Neuen Spieler anlegen** (nur Admin):\n"
             "1. Reiter *Benutzer -> Neuen Benutzer anlegen*.\n"
@@ -374,12 +392,36 @@ KNOWLEDGE: list[Topic] = [
     ),
     Topic(
         title="Login / Anmelden",
-        keywords={"login", "anmelden", "einloggen", "log in", "sign in"},
+        keywords={"login", "anmelden", "einloggen", "log in", "sign in", "wie melde ich", "wie logge ich", "einloggen"},
         answer=(
             "**Anmelden**: Reiter *Anmelden* (oben rechts) oder direkt "
             "`/login`. E-Mail + Passwort eingeben. Nach erfolgreichem Login "
             "lädt die Navigation automatisch die deiner Rolle entsprechenden "
             "Reiter (Verfügbarkeiten und Benutzer-Verwaltung sind Admin-only)."
+        ),
+    ),
+    Topic(
+        title="Selbst registrieren / Konto anlegen",
+        keywords={
+            "selbst anlegen", "selber anlegen", "selbst registrieren",
+            "selber registrieren", "registrieren", "registrierung",
+            "konto erstellen", "konto anlegen", "account erstellen",
+            "account anlegen", "neuen account", "neues konto",
+            "sign up", "signup", "mich anlegen", "mich erstellen",
+            "selbst anmelden", "selber anmelden", "wie werde ich",
+            "wie kann ich mich",
+        },
+        answer=(
+            "Eine **Selbst-Registrierung gibt es bewusst nicht**. Konten "
+            "werden nur vom **Admin** angelegt, damit klar ist, wer Trainer "
+            "und wer Spieler ist und damit niemand ohne Einladung in den "
+            "Verein hineinrutscht.\n\n"
+            "So bekommst du einen Zugang:\n"
+            "1. Sprich deinen Vereins-Admin an.\n"
+            "2. Er legt dich unter *Benutzer -> Neuen Benutzer anlegen* an "
+            "und vergibt ein Initial-Passwort.\n"
+            "3. Du loggst dich mit E-Mail + Passwort ein und füllst dein "
+            "Profil aus (*Trainer/Spieler -> Mein Profil*)."
         ),
     ),
     Topic(
@@ -393,6 +435,55 @@ KNOWLEDGE: list[Topic] = [
     ),
 
     # ---------- Pages / Navigation ----------
+    # Wunsch-Themen ABSICHTLICH vor den Reiter-Topics, weil 'trainer' als
+    # Substring in 'wunschtrainer' steckt und sonst fälschlich Reiter-Trainer
+    # matchen würde.
+    Topic(
+        title="Wunschtrainer",
+        keywords={"wunschtrainer", "lieblingstrainer", "preferred coach", "präferenz trainer", "praeferenz trainer"},
+        answer=(
+            "**Wunschtrainer** werden ausschließlich von **Trainern oder "
+            "Admins** im Reiter *Spieler -> Bearbeiten* pro Spieler "
+            "eingetragen. Spieler selbst sehen das Feld nicht und können es "
+            "auch nicht setzen - sie schreiben ihre Wünsche in das freie "
+            "**Bemerkungsfeld** in ihrem Profil. Trainer werten die "
+            "Bemerkung aus und tragen die Wunschtrainer dann verbindlich "
+            "in der Spielerliste ein.\n\n"
+            "Der Solver gibt einen Score-Bonus, wenn Sessions mit "
+            "hinterlegten Wunschtrainern besetzt werden."
+        ),
+    ),
+    Topic(
+        title="Wunsch-Mitspieler",
+        keywords={"mitspieler", "lieblingspartner", "wunsch mitspieler", "wunschpartner", "preferred partner", "preferred player"},
+        answer=(
+            "**Wunsch-Mitspieler** werden ausschließlich von **Trainern oder "
+            "Admins** im Reiter *Spieler -> Bearbeiten* pro Spieler "
+            "eingetragen. Spieler selbst sehen das Feld nicht; sie nutzen "
+            "ihr Bemerkungsfeld, um Mitspieler-Wünsche zu äußern.\n\n"
+            "Der Solver gibt einen Score-Bonus, wenn zwei Spieler mit "
+            "gegenseitiger Wunsch-Markierung in derselben Session landen."
+        ),
+    ),
+    Topic(
+        title="Spieler-Bemerkung / Notiz",
+        keywords={
+            "bemerkung", "bemerkungen", "notiz", "notizen", "freitext",
+            "kommentar", "hinweis", "hinweise", "feedback", "wunsch",
+            "wünsche", "wuensche",
+        },
+        answer=(
+            "Im **Spieler-Profil** gibt es ein freies **Bemerkungsfeld** "
+            "(bis 2000 Zeichen). Dort tragen Spieler ihre Wünsche und "
+            "Hinweise ein, z.B. bevorzugte Trainer, Wunsch-Mitspieler, "
+            "Verletzungen, sportliche Ziele.\n\n"
+            "Trainer sehen diese Bemerkung in der Spielerliste "
+            "(*Spieler -> Bearbeiten*). Sie entscheiden, welche Wünsche "
+            "sie als Wunschtrainer / Wunsch-Mitspieler in die Spalten "
+            "übernehmen - nur diese strukturierten Felder flüeen in den "
+            "Solver-Score ein."
+        ),
+    ),
     Topic(
         title="Reiter Pläne",
         keywords={"reiter pläne", "tab pläne", "pläne seite", "plansseite", "plans page", "/plaene"},
@@ -479,26 +570,6 @@ KNOWLEDGE: list[Topic] = [
         ),
     ),
     Topic(
-        title="Wunschtrainer",
-        keywords={"wunschtrainer", "lieblingstrainer", "preferred coach", "präferenz trainer", "praeferenz trainer"},
-        answer=(
-            "Im Spieler-Profil können bis zu 3 **Wunschtrainer** angegeben "
-            "werden. Der Solver versucht im Score, diese Wünsche zu "
-            "erfüllen - es ist aber kein Muss. Wunschtrainer haben Vorrang "
-            "vor anderen Trainer-Soft-Constraints."
-        ),
-    ),
-    Topic(
-        title="Wunsch-Mitspieler",
-        keywords={"mitspieler", "lieblingspartner", "wunsch mitspieler", "wunschpartner", "preferred partner", "preferred player"},
-        answer=(
-            "Spieler können **Wunsch-Mitspieler** angeben (z.B. 'spiele am "
-            "liebsten mit Anna und Ben'). Der Solver erhält Pluspunkte, "
-            "wenn er diese Spieler in dieselbe Session steckt - Voraussetzung: "
-            "ähnliche LK und überlappende Verfügbarkeit."
-        ),
-    ),
-    Topic(
         title="Stunden pro Woche",
         keywords={"stunden pro woche", "min slots", "max slots", "wunschstunden", "wunsch stunden", "trainingsstunden"},
         answer=(
@@ -522,6 +593,26 @@ KNOWLEDGE: list[Topic] = [
             "Der Solver darf dann keine 30-Minuten-Einzelstunde planen.\n\n"
             "Sinnvolle Werte: 1 (Einzelstunden zulassen) bis 3 (mind. 90 "
             "Min Block)."
+        ),
+    ),
+    Topic(
+        title="Pausen zwischen Blöcken (Trainer)",
+        keywords={
+            "pause", "pausen", "break", "min pause", "max pause",
+            "mindestpause", "maximalpause", "keine pause", "durchgehend",
+            "am stück", "am stueck", "hintereinander",
+        },
+        answer=(
+            "Im **Trainer-Profil** gibt es zwei Pausen-Regeln (je in Stunden, "
+            "intern in 30-Min-Slots):\n"
+            "- **Mindest-Pause zwischen Blöcken** - wenn der Trainer zwei "
+            "Blöcke am selben Tag hat, muss mindestens diese Pause dazwischen "
+            "liegen. 0 = keine Pause erforderlich.\n"
+            "- **Max. Pause zwischen Blöcken** - leer = kein Limit. **0** "
+            "bedeutet: aufeinanderfolgende Sessions müssen *direkt* "
+            "aneinander anschließen (z.B. um durchgehend an einem "
+            "Trainings-Slot zu bleiben). Werte > 0 setzen eine harte "
+            "Obergrenze in Stunden."
         ),
     ),
     Topic(
@@ -691,6 +782,41 @@ KNOWLEDGE: list[Topic] = [
         keywords={"danke", "thanks", "thank you", "merci", "vielen dank"},
         answer="Gerne! Wenn du noch Fragen hast - tippe **hilfe** für die Themenliste.",
     ),
+    # Catch-all am Ende: generische Fragen zur App / Seite / Tool.
+    # Wichtig: muss nach allen spezifischen Topics stehen, sonst frisst es z.B.
+    # 'Wie funktioniert der Solver?' weg.
+    Topic(
+        title="App-Funktionsweise / Was ist das hier",
+        keywords={
+            "wie funktioniert", "wie funktionierts", "wie geht das",
+            "wie geht's", "wie gehts", "was ist das", "was kann",
+            "was macht", "erklär", "erklaer", "erkläre", "erklaere",
+            "tool", "app", "seite", "webseite", "website", "programm",
+            "software", "system", "anwendung", "plattform",
+            "überblick", "ueberblick", "einführung", "einfuehrung",
+            "intro", "tutorial", "anleitung",
+            "welche reiter", "reiter gibt", "navigation", "navi",
+            "menü", "menue",
+        },
+        answer=(
+            "**Coach Assistant** ist eine Webanwendung zur Erstellung "
+            "wöchentlicher Tennis-Trainingspläne.\n\n"
+            "**Grobablauf**:\n"
+            "1. Der Admin legt Trainer, Spieler und Plätze an.\n"
+            "2. Trainer und Spieler tragen ihre **Verfügbarkeit** und "
+            "Wünsche (Wunschtrainer, Wunsch-Mitspieler, Stunden) in ihrem "
+            "Profil ein.\n"
+            "3. Der Admin startet im Reiter *Pläne -> Saisonwechsel* den "
+            "**Solver**. Der berechnet bis zu 3 optimale Wochenpläne.\n"
+            "4. Der beste Plan wird **aktiviert** und gilt für die ganze "
+            "Saison.\n\n"
+            "**Reiter** der App: Pläne, Trainer, Spieler, Verfügbarkeiten "
+            "(Admin), Benutzer (Admin).\n\n"
+            "Frag mich z.B. 'Wie funktioniert der Solver?', "
+            "'Wie lege ich einen Spieler an?', 'Was ist LK?', oder tippe "
+            "**hilfe** für die volle Themenliste."
+        ),
+    ),
 ]
 
 
@@ -791,21 +917,56 @@ INTENTS: list[tuple[list[set[str]], Callable[[str, AsyncSession], Awaitable[str]
 
 # ---------- Matcher / fallback ----------
 
-
-def _has_any(text: str, words: set[str]) -> bool:
-    return any(w in text for w in words)
-
-
-def _has_all_groups(text: str, groups: list[set[str]]) -> bool:
-    return all(_has_any(text, group) for group in groups)
+# Token-basiertes Matching: ein Keyword matcht, wenn alle seine Wörter als
+# einzelne Tokens im Text vorkommen ODER das Keyword als Substring im Text
+# vorkommt. Damit funktionieren auch umgestellte Sätze
+# ('Wie lege ich einen Trainer an?' matcht 'trainer anlegen').
+_TOKEN_RE = re.compile(r"[A-Za-zÄÖÜäöüß0-9]+")
 
 
-def _topic_score(text: str, topic: Topic) -> int:
-    return sum(1 for kw in topic.keywords if kw in text)
+def _tokens(text: str) -> set[str]:
+    return {m.group(0).lower() for m in _TOKEN_RE.finditer(text)}
 
 
-def _suggest_topics(text: str, limit: int = 4) -> list[str]:
-    scored = [(t, _topic_score(text, t)) for t in KNOWLEDGE]
+def _kw_matches(kw: str, text_lower: str, text_tokens: set[str]) -> bool:
+    kw_low = kw.lower()
+    parts = _TOKEN_RE.findall(kw_low)
+    if not parts:
+        return kw_low in text_lower
+    if len(parts) == 1:
+        p = parts[0]
+        if p in text_tokens:
+            return True
+        # Erlaubt 'verfuegbar' -> 'verfuegbarkeit', 'trainer' -> 'trainerin'.
+        # Kurze Stems (LK, AI) werden NICHT als Substring akzeptiert.
+        if len(p) >= 5:
+            return any(p in tok for tok in text_tokens)
+        return False
+    # multi-word: Substring ODER alle Tokens vorhanden
+    return kw_low in text_lower or all(p in text_tokens for p in parts)
+
+
+def _has_any(text_lower: str, words: set[str]) -> bool:
+    toks = _tokens(text_lower)
+    return any(_kw_matches(w, text_lower, toks) for w in words)
+
+
+def _has_all_groups(text_lower: str, groups: list[set[str]]) -> bool:
+    return all(_has_any(text_lower, group) for group in groups)
+
+
+def _topic_score(text_lower: str, topic: Topic) -> int:
+    toks = _tokens(text_lower)
+    score = 0
+    for kw in topic.keywords:
+        if _kw_matches(kw, text_lower, toks):
+            # Mehrwort-Keywords sind spezifischer -> höheres Gewicht
+            score += 2 if " " in kw else 1
+    return score
+
+
+def _suggest_topics(text_lower: str, limit: int = 4) -> list[str]:
+    scored = [(t, _topic_score(text_lower, t)) for t in KNOWLEDGE]
     scored = [(t, s) for t, s in scored if s > 0]
     scored.sort(key=lambda p: p[1], reverse=True)
     return [t.title for t, _ in scored[:limit]]

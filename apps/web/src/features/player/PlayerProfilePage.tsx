@@ -6,7 +6,6 @@ import { NumberField } from "../../lib/NumberField";
 import { LoginRequired } from "../../components/LoginRequired";
 
 type Coach = { id: string; name: string };
-type Player = { id: string; name: string };
 
 type ProfileResponse = {
   user: { id: string; email: string; role: string };
@@ -18,11 +17,13 @@ type ProfileResponse = {
     min_slots_per_week: number;
     max_slots_per_week: number;
     preferences: {
-      preferred_coach_ids?: string[];
-      preferred_partner_ids?: string[];
+      // Wunschtrainer / Wunsch-Mitspieler werden vom Backend bei einer
+      // Spieler-Rolle entfernt. Sie sind nur für Trainer/Admins sichtbar
+      // und pflegbar.
       allowed_session_types?: string[];
       age?: number | null;
       level_lk?: number | null;
+      notes?: string;
     };
   } | null;
 };
@@ -35,24 +36,13 @@ export function PlayerProfilePage() {
     queryFn: () => api<ProfileResponse>("/me/profile"),
     enabled: authed,
   });
-  const coaches = useQuery<Coach[]>({
-    queryKey: ["coaches"],
-    queryFn: () => api<Coach[]>("/coaches"),
-    enabled: authed,
-  });
-  const players = useQuery<Player[]>({
-    queryKey: ["players"],
-    queryFn: () => api<Player[]>("/players"),
-    enabled: authed,
-  });
 
   const [name, setName] = useState("");
   const [age, setAge] = useState<number | null>(null);
   const [minSlots, setMinSlots] = useState<number | null>(0);
   const [maxSlots, setMaxSlots] = useState<number | null>(4);
   const [slots, setSlots] = useState<number[]>([]);
-  const [coachIds, setCoachIds] = useState<string[]>([]);
-  const [partnerIds, setPartnerIds] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     const p = me.data?.player;
@@ -65,8 +55,7 @@ export function PlayerProfilePage() {
     setMinSlots(p.min_slots_per_week);
     setMaxSlots(p.max_slots_per_week);
     setSlots(p.availability);
-    setCoachIds(p.preferences.preferred_coach_ids ?? []);
-    setPartnerIds(p.preferences.preferred_partner_ids ?? []);
+    setNotes(p.preferences.notes ?? "");
   }, [me.data]);
 
   const save = useMutation({
@@ -79,10 +68,12 @@ export function PlayerProfilePage() {
           min_slots_per_week: minSlots ?? 0,
           max_slots_per_week: maxSlots ?? 0,
           preferences: {
-            preferred_coach_ids: coachIds,
-            preferred_partner_ids: partnerIds,
+            // preferred_coach_ids / preferred_partner_ids werden vom Backend
+            // beim Spieler-Self-Edit ignoriert (nur Trainer/Admins dürfen sie
+            // setzen). Wir senden sie deshalb gar nicht erst mit.
             allowed_session_types: ["single", "double", "group"],
             age,
+            notes,
           },
         }),
       }),
@@ -159,23 +150,26 @@ export function PlayerProfilePage() {
       </div>
 
       <div className="card">
-        <h3 className="card__title">Wunschtrainer</h3>
-        <MultiSelect
-          options={(coaches.data ?? []).map((c) => ({ id: c.id, label: c.name }))}
-          selected={coachIds}
-          onChange={setCoachIds}
+        <h3 className="card__title">Bemerkungen für die Trainer</h3>
+        <p className="muted" style={{ fontSize: "var(--text-xs)" }}>
+          Hier kannst du Wünsche und Hinweise eintragen, z.B. bevorzugte
+          Trainer oder Mitspieler, Verletzungen, Ziele… Die Trainer lesen
+          das und entscheiden, was im Plan berücksichtigt wird.
+        </p>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={5}
+          maxLength={2000}
+          style={{ width: "100%", fontFamily: "inherit" }}
+          placeholder="z.B. Trainiere am liebsten mit Max und Anna. Mittwochs nur ab 18 Uhr möglich. Aktuell Schulter-Reha."
         />
-      </div>
-
-      <div className="card">
-        <h3 className="card__title">Wunsch-Mitspieler</h3>
-        <MultiSelect
-          options={(players.data ?? [])
-            .filter((p) => p.id !== me.data?.player?.id)
-            .map((p) => ({ id: p.id, label: p.name }))}
-          selected={partnerIds}
-          onChange={setPartnerIds}
-        />
+        <span
+          className="muted"
+          style={{ fontSize: "var(--text-xs)", display: "block" }}
+        >
+          {notes.length} / 2000 Zeichen
+        </span>
       </div>
 
       <div className="row">
@@ -190,41 +184,5 @@ export function PlayerProfilePage() {
         )}
       </div>
     </section>
-  );
-}
-
-function MultiSelect({
-  options,
-  selected,
-  onChange,
-}: {
-  options: { id: string; label: string }[];
-  selected: string[];
-  onChange: (ids: string[]) => void;
-}) {
-  function toggle(id: string) {
-    if (selected.includes(id)) onChange(selected.filter((x) => x !== id));
-    else onChange([...selected, id]);
-  }
-  if (options.length === 0)
-    return <p className="muted">(noch keine Auswahl verfügbar)</p>;
-  return (
-    <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
-      {options.map((o) => {
-        const on = selected.includes(o.id);
-        return (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => toggle(o.id)}
-            className={on ? "" : "btn--ghost"}
-            style={{ padding: "4px 10px", fontSize: "var(--text-sm)" }}
-          >
-            {on ? "✓ " : ""}
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
   );
 }
