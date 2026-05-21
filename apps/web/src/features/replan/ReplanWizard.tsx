@@ -39,6 +39,7 @@ export function ReplanWizard() {
 
   // Step 3: generate plan
   const [numVariants, setNumVariants] = useState(3);
+  const [courtFilter, setCourtFilter] = useState<"both" | "indoor" | "outdoor">("both");
   const [generated, setGenerated] = useState<Plan[] | null>(null);
   const generate = useMutation({
     mutationFn: () =>
@@ -48,6 +49,7 @@ export function ReplanWizard() {
           season_id: newSeasonId,
           num_solutions: numVariants,
           time_limit_seconds: 30,
+          court_filter: courtFilter,
         }),
       }),
     onSuccess: (plans) => setGenerated(plans),
@@ -123,6 +125,19 @@ export function ReplanWizard() {
               onChange={(e) => setNumVariants(Number(e.target.value) || 1)}
             />
           </label>
+          <label style={{ marginLeft: 16 }}>
+            Plätze:&nbsp;
+            <select
+              value={courtFilter}
+              onChange={(e) =>
+                setCourtFilter(e.target.value as "both" | "indoor" | "outdoor")
+              }
+            >
+              <option value="both">alle (Indoor + Outdoor)</option>
+              <option value="indoor">nur Halle (Indoor)</option>
+              <option value="outdoor">nur draußen (Outdoor)</option>
+            </select>
+          </label>
           <button
             onClick={() => generate.mutate()}
             disabled={generate.isPending}
@@ -130,6 +145,11 @@ export function ReplanWizard() {
           >
             {generate.isPending ? "rechne..." : "Pläne generieren"}
           </button>
+          {generate.error && (
+            <p style={{ color: "crimson" }}>
+              Fehler: {(generate.error as Error).message}
+            </p>
+          )}
 
           {generated && (
             <>

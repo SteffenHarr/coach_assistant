@@ -245,6 +245,57 @@ async def create_court(
     return CourtOut(id=saved.id, **data.model_dump())
 
 
+@router.put("/courts/{court_id}", response_model=CourtOut)
+async def update_court(
+    court_id: UUID,
+    data: CourtIn,
+    db: AsyncSession = Depends(get_db),
+    user: UserORM = Depends(require_role(UserRole.ADMIN)),
+) -> CourtOut:
+    """Admin: bestehenden Platz updaten (Name, Indoor, Verfügbarkeit)."""
+    from coach_api.infrastructure.models import CourtORM
+
+    existing = await db.get(CourtORM, court_id)
+    if existing is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "court not found")
+    repo = SqlCourtRepository(db)
+    court = Court(
+        id=court_id,
+        name=data.name,
+        availability=frozenset(data.availability),
+        indoor=data.indoor,
+    )
+    saved = await repo.upsert(court)
+    await _audit(db, user, "update", "court", str(court_id), data.model_dump())
+    return CourtOut(id=saved.id, **data.model_dump())
+
+
+@router.delete("/courts/{court_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_court(
+    court_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: UserORM = Depends(require_role(UserRole.ADMIN)),
+) -> None:
+    """Admin: Platz löschen. Schlägt fehl, wenn er noch in Plänen verwendet wird."""
+    from coach_api.infrastructure.models import CourtORM
+
+    existing = await db.get(CourtORM, court_id)
+    if existing is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "court not found")
+    name = existing.name
+    try:
+        await db.delete(existing)
+        await db.commit()
+    except Exception as exc:  # FK-Verletzung etc.
+        await db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Platz kann nicht gelöscht werden – wird vermutlich noch von "
+            "einem Plan referenziert.",
+        ) from exc
+    await _audit(db, user, "delete", "court", str(court_id), {"name": name})
+
+
 # ---------- Seasons ----------
 
 
@@ -294,13 +345,18 @@ async def generate_plans(
                 season_id=data.season_id,
                 num_solutions=data.num_solutions,
                 time_limit_seconds=data.time_limit_seconds,
+                court_filter=data.court_filter,
             )
         )
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(e)) from e
     await _audit(
         db, user, "generate", "plan_batch", str(data.season_id),
-        {"num_solutions": data.num_solutions, "produced": len(plans)},
+        {
+            "num_solutions": data.num_solutions,
+            "produced": len(plans),
+            "court_filter": data.court_filter,
+        },
     )
     return [_plan_to_out(p) for p in plans]
 

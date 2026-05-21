@@ -793,11 +793,19 @@ KNOWLEDGE: list[Topic] = [
         title="Plätze / Courts",
         keywords={"platz", "plätze", "plaetze", "court", "courts", "halle", "outdoor", "tennisplatz"},
         answer=(
-            "**Plätze** verwalten (Admin): Reiter *Verfügbarkeiten* zeigt "
-            "Platz-Verfügbarkeiten. Anlage neuer Plätze aktuell nur per "
-            "API (`POST /api/courts`) - dort: Name, Indoor (true/false), "
-            "Verfügbarkeit. Der Solver weist jeder Session einen Platz zu "
-            "und minimiert Wechsel zwischen Plätzen pro Spieler."
+            "**Plätze** verwalten (Admin): eigener Reiter *Plätze* in der "
+            "Navigation. Dort kannst du neue Plätze anlegen (Name, Halle "
+            "ja/nein, Verfügbarkeits-Grid in 30-Min-Slots), bestehende "
+            "Plätze bearbeiten oder löschen. Alternativ direkt per API: "
+            "`POST /api/courts`, `PUT /api/courts/{id}`, `DELETE /api/courts/{id}`.\n\n"
+            "**Indoor vs. Outdoor**: Pro Platz steht ein `indoor`-Flag. "
+            "Beim **Pläne generieren** kannst du wählen, ob nur "
+            "Halle, nur draußen, oder beides verwendet werden soll - "
+            "praktisch z.B. für Winter-Pläne, in denen die Outdoor-Plätze "
+            "ausgeblendet werden sollen.\n\n"
+            "Der Solver weist jeder Session einen Platz zu, respektiert "
+            "die Platz-Verfügbarkeit als harten Filter und minimiert "
+            "Wechsel zwischen Plätzen pro Spieler."
         ),
     ),
 

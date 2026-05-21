@@ -7,6 +7,7 @@ from response models by construction.
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 from uuid import UUID
 
 from fastapi_users import schemas as fa_schemas
@@ -237,6 +238,10 @@ class GeneratePlanIn(BaseModel):
     season_id: UUID
     num_solutions: int = Field(3, ge=1, le=10)
     time_limit_seconds: float = Field(30.0, ge=1.0, le=300.0)
+    # "both" (Default) = alle Plätze. "indoor" = nur Hallenplätze.
+    # "outdoor" = nur Außenplätze. So kann der Coach z.B. für den
+    # Winterplan die Outdoor-Plätze ausblenden.
+    court_filter: Literal["both", "indoor", "outdoor"] = "both"
 
 
 class WorkloadDeltaOut(BaseModel):

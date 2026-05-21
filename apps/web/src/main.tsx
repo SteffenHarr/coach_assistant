@@ -12,6 +12,7 @@ import { PlanDiffView } from "./features/plan/PlanDiffView";
 import { AvailabilityPage } from "./features/availability/AvailabilityPage";
 import { CoachEditorPage } from "./features/coach/CoachEditorPage";
 import { CoachListPage } from "./features/coach/CoachListPage";
+import { CourtsAdminPage } from "./features/court/CourtsAdminPage";
 import { CoachProfilePage } from "./features/coach/CoachProfilePage";
 import { PlayerListPage } from "./features/player/PlayerListPage";
 import { PlayerProfilePage } from "./features/player/PlayerProfilePage";
@@ -207,6 +208,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <NavLink to="/plaene" className={navLinkClass}>Pläne</NavLink>
             </AuthedOnly>
             <AdminOnlyLink to="/verfuegbarkeiten" label="Verfügbarkeiten" />
+            <AdminOnlyLink to="/plaetze" label="Plätze" />
             <span className="app-nav__spacer" />
             <AuthNavLink />
           </nav>
@@ -222,6 +224,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             </Route>
             <Route path="/plans/:planId" element={<RequireAuth><App><PlanDetailPage /></App></RequireAuth>} />
             <Route path="/verfuegbarkeiten" element={<RequireAuth><App><AvailabilityPage /></App></RequireAuth>} />
+            <Route path="/plaetze" element={<RequireAuth><App><CourtsAdminPage /></App></RequireAuth>} />
             <Route path="/trainer" element={<RequireAuth><App><CoachLayout /></App></RequireAuth>}>
               <Route index element={<CoachListPage />} />
               <Route path="profil" element={<CoachProfilePage />} />

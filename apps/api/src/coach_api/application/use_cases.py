@@ -25,6 +25,9 @@ class GeneratePlanCommand:
     num_solutions: int = 3
     time_limit_seconds: float = 30.0
     weights: ObjectiveWeights | None = None
+    # "both" = alle Plätze, "indoor" = nur Hallenplätze, "outdoor" = nur
+    # Außenplätze. Filter wird **vor** dem Solver angewendet.
+    court_filter: str = "both"
 
 
 class GeneratePlanUseCase:
@@ -50,6 +53,17 @@ class GeneratePlanUseCase:
         coaches = await self._coaches.list_all()
         players = await self._players.list_all()
         courts = await self._courts.list_all()
+
+        # Indoor/Outdoor-Filter anwenden, bevor der Solver läuft.
+        if cmd.court_filter == "indoor":
+            courts = [c for c in courts if c.indoor]
+        elif cmd.court_filter == "outdoor":
+            courts = [c for c in courts if not c.indoor]
+        if not courts:
+            raise ValueError(
+                f"Keine Plätze nach Filter '{cmd.court_filter}' übrig - "
+                "bitte Filter ändern oder passende Plätze anlegen."
+            )
 
         grid = TimeGrid()
         diag = preflight(coaches, players, courts, grid.total_slots)
