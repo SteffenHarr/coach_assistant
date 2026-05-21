@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from coach_api.config import get_settings
 from coach_api.infrastructure.auth import (
@@ -54,6 +55,32 @@ def create_app() -> FastAPI:
 
     # Domain routes
     app.include_router(api_router, prefix="", tags=["coach-assistant"])
+
+    # ---- Diagnostic exception handler ----
+    # Until we have full Sentry integration, surface the actual exception
+    # type & message in the response body for any uncaught 500. This makes
+    # it trivial to diagnose problems from the browser/chat UI instead of
+    # having to dig through container logs every time.
+    import logging
+    import traceback
+
+    @app.exception_handler(Exception)
+    async def _diag_exception_handler(request: Request, exc: Exception):
+        logging.getLogger("coach_api.unhandled").exception(
+            "Unhandled exception on %s %s", request.method, request.url.path
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": (
+                    f"{type(exc).__name__}: {exc}"
+                    if str(exc)
+                    else type(exc).__name__
+                ),
+                "path": request.url.path,
+                "trace": traceback.format_exception_only(type(exc), exc),
+            },
+        )
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
