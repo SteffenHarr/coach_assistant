@@ -351,9 +351,20 @@ async def chat(
     Answers from a static knowledge base and live DB queries via keyword
     matching. Sub-10ms response time, no GPU/CPU spike.
     """
+    import logging
+    import traceback
+
     from coach_api.infrastructure.bot import answer
 
-    reply = await answer(data.message, db)
+    try:
+        reply = await answer(data.message, db)
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("coach_api.chat").exception("Chat bot failed")
+        reply = (
+            "Interner Fehler im Chat-Bot:\n```\n"
+            + "".join(traceback.format_exception_only(type(exc), exc)).strip()
+            + "\n```"
+        )
     return ChatResponse(reply=reply)
 
 
@@ -366,11 +377,22 @@ async def chat_stream_endpoint(
     """Streaming variant of the chat endpoint. The bot computes the full
     answer instantly; we still stream so the frontend can use a single
     code path for both the legacy LLM agent and the new bot."""
+    import logging
+    import traceback
+
     from fastapi.responses import StreamingResponse
 
     from coach_api.infrastructure.bot import answer
 
-    reply = await answer(data.message, db)
+    try:
+        reply = await answer(data.message, db)
+    except Exception as exc:  # noqa: BLE001
+        logging.getLogger("coach_api.chat").exception("Chat bot failed")
+        reply = (
+            "Interner Fehler im Chat-Bot:\n```\n"
+            + "".join(traceback.format_exception_only(type(exc), exc)).strip()
+            + "\n```"
+        )
 
     async def gen():
         # Yield the reply in small chunks for a slight typewriter effect —

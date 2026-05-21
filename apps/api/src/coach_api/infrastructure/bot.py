@@ -778,7 +778,10 @@ async def _count_users(_text: str, db: AsyncSession) -> str:
     rows = (await db.execute(select(UserORM))).scalars().all()
     by_role: dict[str, int] = {}
     for u in rows:
-        by_role[u.role] = by_role.get(u.role, 0) + 1
+        # Role is a StrEnum on the ORM; coerce to str to keep dict keys
+        # uniform and sortable regardless of dialect.
+        key = str(getattr(u.role, "value", u.role) or "unknown")
+        by_role[key] = by_role.get(key, 0) + 1
     if not by_role:
         return "Keine Benutzer im System."
     lines = [f"**{len(rows)} Benutzer** insgesamt:"]
@@ -796,9 +799,11 @@ async def _list_plans(_text: str, db: AsyncSession) -> str:
     )).all()
     if not rows:
         return "Es wurden noch keine Pläne generiert."
-    lines = [f"**Letzte Pläne** (max. 10):"]
+    lines = ["**Letzte Pläne** (max. 10):"]
     for plan, season in rows:
-        lines.append(f"• {season.name} — Score {plan.score:.1f} ({plan.created_at:%Y-%m-%d})")
+        score = f"{plan.score:.1f}" if plan.score is not None else "—"
+        created = plan.created_at.strftime("%Y-%m-%d") if plan.created_at else "—"
+        lines.append(f"• {season.name} — Score {score} ({created})")
     return "\n".join(lines)
 
 
