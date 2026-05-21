@@ -14,6 +14,54 @@ class SessionType(StrEnum):
     GROUP = "group"        # >=3 players
 
 
+class TrainingCategory(StrEnum):
+    """Art des Trainings, das ein Spieler braucht / ein Trainer abdeckt.
+
+    Ein Spieler **und** ein Trainer können jeweils *mehrere* Kategorien
+    haben. Die Zuteilung gilt als kompatibel, wenn die Mengen sich
+    schneiden – oder wenn mindestens eine Seite leer ist (= "nicht
+    zugewiesen" = Wildcard).
+
+    ``OPEN`` ist die explizite Wildcard und wirkt wie eine leere Menge.
+    Sie existiert nur noch aus Abwärtskompatibilität für vorhandene
+    Daten und wird in :func:`effective_categories` zu ``frozenset()``
+    normalisiert.
+    """
+
+    KIDS = "kids"          # Kindertraining
+    YOUTH = "youth"        # Jugendtraining
+    ADULTS = "adults"      # Erwachsenentraining
+    TEAM = "team"          # Mannschaftstraining
+    OPEN = "open"          # frei / keine Einschränkung (== leere Menge)
+
+
+def effective_categories(
+    cats: "frozenset[TrainingCategory] | set[TrainingCategory] | None",
+) -> frozenset["TrainingCategory"]:
+    """Normalisiert: enthält OPEN -> leere Menge (Wildcard)."""
+    if not cats:
+        return frozenset()
+    if TrainingCategory.OPEN in cats:
+        return frozenset()
+    return frozenset(cats)
+
+
+def categories_compatible(
+    a: "frozenset[TrainingCategory] | set[TrainingCategory] | None",
+    b: "frozenset[TrainingCategory] | set[TrainingCategory] | None",
+) -> bool:
+    """True, wenn die beiden Kategorie-Mengen zusammen trainieren dürfen.
+
+    Regel: leere Menge auf einer Seite = Wildcard; sonst muss die
+    Schnittmenge nicht leer sein.
+    """
+    ea = effective_categories(a)
+    eb = effective_categories(b)
+    if not ea or not eb:
+        return True
+    return not ea.isdisjoint(eb)
+
+
 @dataclass(frozen=True, slots=True)
 class CoachConstraints:
     """Hard scheduling constraints for a coach.
@@ -40,6 +88,9 @@ class Coach:
     availability: frozenset[int] = field(default_factory=frozenset)
     constraints: CoachConstraints = field(default_factory=CoachConstraints)
     max_group_size: int = 4
+    # Welche Trainings-Kategorien deckt dieser Trainer ab?
+    # Leere Menge oder {OPEN} = nimmt jeden Spieler.
+    categories: frozenset[TrainingCategory] = field(default_factory=frozenset)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,16 +103,44 @@ class PlayerPreferences:
     notes: str = ""   # Freitext, vom Spieler gepflegt, von Trainern lesbar
 
 
+@dataclass(frozen=True, slots=True)
+class Lesson:
+    """Eine vom Trainer gewünschte Trainingseinheit pro Woche."""
+
+    duration_slots: int        # z.B. 2 Slots = 60 Minuten
+    group_size: int            # 1 = Einzel, 2 = Doppel, 3+ = Gruppe
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerMate:
+    """Ein Wunschspieler-Partner für einen Spieler.
+
+    ``mandatory=True`` => muss in jeder Session dieses Spielers ebenfalls
+    anwesend sein (hartes Constraint).
+    ``mandatory=False`` => Solver bevorzugt diesen Partner, ist aber frei
+    andere passende Spieler zu wählen.
+    """
+
+    player_id: UUID
+    mandatory: bool = False
+
+
 @dataclass(slots=True)
 class Player:
     name: str
     id: UUID = field(default_factory=uuid4)
     availability: frozenset[int] = field(default_factory=frozenset)
     preferences: PlayerPreferences = field(default_factory=PlayerPreferences)
-    min_slots_per_week: int = 0
+    min_slots_per_week: int = 0   # wird aus lessons abgeleitet (Backend)
     max_slots_per_week: int = 4
     age: int | None = None
-    level_lk: int | None = None        # German LK 1..25 (1=strongest)
+    level_lk: int | None = None        # German LK 1..25 (1=strongest) – nur weicher Bonus
+    lessons: tuple[Lesson, ...] = ()   # gewünschte Einheiten pro Woche
+    mates: tuple[PlayerMate, ...] = () # Wunschspieler vom Trainer kuratiert
+    # Welche Trainings-Kategorien braucht dieser Spieler? Leere Menge =
+    # nicht zugewiesen = Wildcard. Mehrere Kategorien sind möglich
+    # (z.B. ein 17-jähriger spielt im Jugend- und Mannschaftstraining).
+    categories: frozenset[TrainingCategory] = field(default_factory=frozenset)
 
 
 @dataclass(slots=True)

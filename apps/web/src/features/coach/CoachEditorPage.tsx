@@ -5,6 +5,15 @@ import { AvailabilityGrid } from "../availability/AvailabilityGrid";
 import { SLOT_MINUTES } from "../../lib/timeGrid";
 import { LoginRequired, isAuthError } from "../../components/LoginRequired";
 
+type Category = "kids" | "youth" | "adults" | "team" | "open";
+const CATEGORY_LABEL: Record<Category, string> = {
+  kids: "Kinder",
+  youth: "Jugend",
+  adults: "Erwachsene",
+  team: "Mannschaft",
+  open: "frei (alle)",
+};
+
 type Coach = {
   id: string;
   name: string;
@@ -16,6 +25,7 @@ type Coach = {
     min_break_slots: number;
   };
   max_group_size: number;
+  categories?: Category[];
 };
 
 const slotsForHours = (h: number) => Math.round((h * 60) / SLOT_MINUTES);
@@ -41,6 +51,14 @@ export function CoachEditorPage() {
     mutationFn: async () => {
       if (!draft) return;
       await api("/coaches", { method: "POST", body: JSON.stringify(draft) });
+      // Kategorien laufen über einen separaten Endpoint (PATCH), da das
+      // POST-/coaches-Schema die Liste sonst stillschweigend auf die
+      // Default-Werte zurücksetzen würde, wenn das Frontend kein
+      // categories-Feld mitschickt.
+      await api(`/coaches/${draft.id}/categories`, {
+        method: "PATCH",
+        body: JSON.stringify({ categories: draft.categories ?? [] }),
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["coaches"] }),
   });
@@ -133,6 +151,46 @@ export function CoachEditorPage() {
                 onChange={(v) => setDraft({ ...draft, max_group_size: Math.max(1, Number(v) || 1) })}
                 step={1}
               />
+
+              <div>
+                <label style={{ display: "block", marginBottom: 6 }}>
+                  Trainings-Kategorien (hartes Filterkriterium)
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {(Object.keys(CATEGORY_LABEL) as Category[]).map((cat) => {
+                    const on = (draft.categories ?? []).includes(cat);
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => {
+                          const cur = draft.categories ?? [];
+                          const next = on
+                            ? cur.filter((c) => c !== cat)
+                            : [...cur, cat];
+                          setDraft({ ...draft, categories: next });
+                        }}
+                        style={{
+                          padding: "4px 10px",
+                          fontSize: 13,
+                          border: "1px solid #aaa",
+                          borderRadius: 4,
+                          background: on ? "#1976d2" : "#fff",
+                          color: on ? "#fff" : "#333",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {on ? "✓ " : ""}
+                        {CATEGORY_LABEL[cat]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: 11, color: "#666", margin: "4px 0 0" }}>
+                  Leere Auswahl oder "frei" = nimmt jeden Spieler. Sonst nur
+                  Spieler mit passender Kategorie.
+                </p>
+              </div>
             </div>
 
             <button

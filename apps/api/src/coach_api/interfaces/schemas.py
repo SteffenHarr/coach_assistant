@@ -12,7 +12,7 @@ from uuid import UUID
 from fastapi_users import schemas as fa_schemas
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from coach_api.domain.entities import SessionType
+from coach_api.domain.entities import SessionType, TrainingCategory
 
 
 # ---------- Auth ----------
@@ -88,6 +88,7 @@ class CoachIn(BaseModel):
     availability: list[int] = Field(default_factory=list)
     constraints: CoachConstraintsIn = Field(default_factory=CoachConstraintsIn)
     max_group_size: int = Field(4, ge=1, le=12)
+    categories: list[TrainingCategory] = Field(default_factory=list)
 
     @field_validator("availability")
     @classmethod
@@ -128,10 +129,30 @@ class PlayerIn(BaseModel):
     preferences: PlayerPreferencesIn = Field(default_factory=PlayerPreferencesIn)
     min_slots_per_week: int = Field(0, ge=0, le=48)
     max_slots_per_week: int = Field(4, ge=0, le=48)
+    categories: list[TrainingCategory] = Field(default_factory=list)
+    lessons: list["LessonIn"] = Field(default_factory=list)
+    mates: list["PlayerMateIn"] = Field(default_factory=list)
+
+
+class LessonIn(BaseModel):
+    """Eine gewünschte Trainingseinheit pro Woche."""
+
+    duration_slots: int = Field(ge=1, le=12)   # 1..12 Slots = 30..360 Min
+    group_size: int = Field(ge=1, le=8)
+
+
+class PlayerMateIn(BaseModel):
+    """Ein Wunschpartner für diesen Spieler."""
+
+    player_id: UUID
+    mandatory: bool = False
 
 
 class PlayerOut(PlayerIn):
     id: UUID
+
+
+PlayerIn.model_rebuild()
 
 
 # ---------- Court ----------
@@ -173,6 +194,35 @@ class TrainingSessionOut(BaseModel):
     player_ids: list[UUID]
     slot_indices: list[int]
     session_type: SessionType
+
+
+class TrainingSessionIn(BaseModel):
+    """Eine vom Nutzer im Editor angepasste Session.
+
+    ``session_type`` wird beim Speichern aus ``len(player_ids)`` neu
+    abgeleitet, deshalb optional."""
+
+    coach_id: UUID
+    court_id: UUID
+    player_ids: list[UUID] = Field(default_factory=list)
+    slot_indices: list[int] = Field(min_length=1)
+    session_type: SessionType | None = None
+
+    @field_validator("slot_indices")
+    @classmethod
+    def _check_slots(cls, v: list[int]) -> list[int]:
+        if any(not 0 <= s < 7 * 48 for s in v):
+            raise ValueError("slot index out of range")
+        v = sorted(set(v))
+        # must be consecutive within a single day
+        for i in range(1, len(v)):
+            if v[i] != v[i - 1] + 1:
+                raise ValueError("slot_indices must be consecutive")
+        return v
+
+
+class PlanUpdateIn(BaseModel):
+    sessions: list[TrainingSessionIn]
 
 
 class PlanOut(BaseModel):

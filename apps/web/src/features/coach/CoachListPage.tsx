@@ -3,11 +3,21 @@ import { api, isLoggedIn } from "../../api/client";
 import { SLOT_MINUTES } from "../../lib/timeGrid";
 import { LoginRequired, isAuthError } from "../../components/LoginRequired";
 
+type Category = "kids" | "youth" | "adults" | "team" | "open";
+const CATEGORY_LABEL: Record<Category, string> = {
+  kids: "Kinder",
+  youth: "Jugend",
+  adults: "Erwachsene",
+  team: "Mannschaft",
+  open: "frei",
+};
+
 type CoachFull = {
   id: string;
   name: string;
   availability: number[];
   max_group_size: number;
+  categories?: Category[];
   constraints: {
     min_block_slots?: number;
     max_slots_per_day?: number | null;
@@ -61,6 +71,7 @@ export function CoachListPage() {
             <tr>
               <th>Name</th>
               <th>Max. Gruppe</th>
+              <th>Kategorien</th>
               <th>Akzeptiert LK</th>
               <th>Akzeptiert Alter</th>
               <th>Max./Tag</th>
@@ -73,6 +84,11 @@ export function CoachListPage() {
               <tr key={c.id}>
                 <td>{c.name}</td>
                 <td>{c.max_group_size}</td>
+                <td>
+                  {c.categories && c.categories.length > 0
+                    ? c.categories.map((cat) => CATEGORY_LABEL[cat] ?? cat).join(", ")
+                    : "alle"}
+                </td>
                 <td>{range(c.constraints.accepts_lk_min, c.constraints.accepts_lk_max, " LK")}</td>
                 <td>{range(c.constraints.accepts_age_min, c.constraints.accepts_age_max, "")}</td>
                 <td>{hoursOf(c.constraints.max_slots_per_day)}</td>

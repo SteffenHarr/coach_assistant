@@ -73,6 +73,11 @@ class PlayerORM(Base):
     preferences: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     min_slots_per_week: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     max_slots_per_week: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
+    # Liste {duration_slots, group_size} - vom Trainer pro Spieler gepflegt.
+    lessons: Mapped[list[dict]] = mapped_column(JSON, default=list, nullable=False)
+    # Liste {player_id, mandatory} - vom Trainer kuratierte Wunschpartner.
+    # Symmetrie wird im Repository erzwungen.
+    mates: Mapped[list[dict]] = mapped_column(JSON, default=list, nullable=False)
 
 
 class CourtORM(Base):

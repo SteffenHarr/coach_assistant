@@ -79,7 +79,10 @@ KNOWLEDGE: list[Topic] = [
             "- 'Wie ändere ich ein Passwort?'\n\n"
             "**Tennis-Konzepte**\n"
             "- 'Was bedeutet LK?', 'Was ist Spielstärke?'\n"
-            "- 'Was sind Gruppengrößen?'\n\n"
+            "- 'Was ist die Trainings-Kategorie?'\n"
+            "- 'Was sind Gruppengrößen?'\n"
+            "- 'Was sind Trainings-Einheiten / Lessons?'\n"
+            "- 'Was sind Wunschspieler / Mates?'\n\n"
             "**Verfügbarkeit & Profil**\n"
             "- 'Wie ändere ich meine Verfügbarkeit?'\n"
             "- 'Wie ändere ich mein Profil?'\n\n"
@@ -105,7 +108,7 @@ KNOWLEDGE: list[Topic] = [
     # ---------- Tennis concepts ----------
     Topic(
         title="LK / Leistungsklasse",
-        keywords={"lk", "leistungsklasse", "spielstärke", "spielstaerke", "ranking", "level"},
+        keywords={"lk", "leistungsklasse", "spielstärke", "spielstaerke", "ranking", "level", "alter", "altersfilter", "age"},
         answer=(
             "**LK = Leistungsklasse** (deutsche Tennis-Skala 1-25).\n"
             "- LK 1 = Profi/Top-Spieler\n"
@@ -113,9 +116,105 @@ KNOWLEDGE: list[Topic] = [
             "Im Coach Assistant:\n"
             "- Die LK eines Spielers setzt **nur ein Trainer** "
             "(Reiter *Spieler -> Liste*, Inline-Editor in der LK-Spalte).\n"
-            "- Trainer hinterlegen in ihrem Profil, welchen LK-Bereich sie "
-            "trainieren (`accepts_lk_min`/`accepts_lk_max`). Der Solver "
-            "kombiniert dann nur passende Trainer mit Spielern."
+            "- Trainer hinterlegen in ihrem Profil ihren bevorzugten LK- "
+            "und Alters-Bereich. Der Solver nutzt **beide nur als weiche "
+            "Boni** - Spieler außerhalb des Bereichs können trotzdem "
+            "zugeteilt werden, wenn sonst keine Lösung möglich wäre.\n"
+            "- Das **einzige harte Filterkriterium** zwischen Trainer und "
+            "Spieler ist die **Trainings-Kategorie** (Kinder/Jugend/"
+            "Erwachsene/Mannschaft/Frei) - siehe Hilfe-Thema *Trainings-"
+            "Kategorie*.\n"
+            "- Die eigentliche Spieler/Trainer-Paarung sollte über "
+            "**Wunschspieler** (Mates, pro Spieler vom Trainer kuratiert) "
+            "und **Trainings-Einheiten** (Lessons, pro Spieler) gesteuert "
+            "werden - siehe entsprechende Hilfe-Themen."
+        ),
+    ),
+    Topic(
+        title="Trainings-Kategorie",
+        keywords={
+            "kategorie", "kategorien", "trainings-kategorie", "trainingskategorie",
+            "kindertraining", "jugendtraining", "erwachsenentraining",
+            "mannschaftstraining", "frei", "kids", "youth", "adults", "team", "open",
+            "kinder", "jugend", "erwachsene", "mannschaft",
+        },
+        answer=(
+            "**Trainings-Kategorien** sind das einzige harte Filter zwischen "
+            "Trainer und Spieler:\n\n"
+            "- `kids` / Kinder\n"
+            "- `youth` / Jugend\n"
+            "- `adults` / Erwachsene\n"
+            "- `team` / Mannschaft\n\n"
+            "**Pro Spieler** *und* **pro Trainer** kann jeweils eine *Menge* "
+            "an Kategorien gepflegt werden (z.B. ein 17-Jähriger im "
+            "Jugend- *und* Mannschaftstraining; ein Trainer, der Kinder *und* "
+            "Jugend übernimmt).\n\n"
+            "**Solver-Regeln (hart):**\n"
+            "- Leere Spieler- oder Trainer-Kategorienliste = *nicht "
+            "zugewiesen* = Wildcard (passt zu allem).\n"
+            "- Sonst müssen sich Spieler- und Trainer-Kategorien "
+            "schneiden, sonst wird der Spieler diesem Trainer nicht "
+            "zugeteilt.\n"
+            "- **Zusätzlich**: zwei Spieler dürfen nur dann in derselben "
+            "Gruppen-Session sein, wenn ihre Kategorien sich schneiden "
+            "*oder* mindestens einer von beiden keine Kategorien gesetzt "
+            "hat. So landen Kinder nicht mit Erwachsenen in einer Gruppe, "
+            "auch wenn beide demselben Trainer zugewiesen sind.\n\n"
+            "Pflege:\n"
+            "- Spieler: Reiter *Spieler -> Liste*, Toggle-Buttons in der "
+            "Spalte *Kategorie*.\n"
+            "- Trainer: Reiter *Trainer-Editor*, Multi-Button-Block am Ende "
+            "der Constraints.\n\n"
+            "Im allerletzten Fallback-Tier wird dieser Filter notfalls "
+            "weichgemacht, dann sollte der Coach den Plan im DnD-Editor "
+            "manuell nachjustieren."
+        ),
+    ),
+    Topic(
+        title="Trainings-Einheiten / Lessons",
+        keywords={
+            "lessons", "einheiten", "trainings-einheiten", "trainingseinheit",
+            "stunden pro woche", "wieviele stunden", "wie viele stunden",
+            "wochenstunden", "gruppengröße pro stunde", "gruppengroesse",
+        },
+        answer=(
+            "Pro Spieler kann der Trainer in der **Spieler-Liste** "
+            "(Bearbeiten) eine Liste von Trainings-Einheiten pflegen. "
+            "Jede Einheit hat:\n"
+            "- **Dauer** (30 Min bis 3 Stunden, in 30-Min-Schritten),\n"
+            "- **Gruppengröße** (1 = Einzel, 2 = Doppel, 3+ = Gruppe).\n\n"
+            "Beispiel: '60 Min Einzel + 60 Min 4er-Gruppe' = 2 Einheiten.\n\n"
+            "Wirkung:\n"
+            "- `min_slots_per_week` des Spielers wird automatisch auf die "
+            "Summe der Dauern gesetzt.\n"
+            "- Der Solver bekommt **einen Bonus** wenn die tatsächliche "
+            "Gruppengröße im Plan einer der Wunschgrößen entspricht und "
+            "**eine Strafe**, wenn nicht. Er wird also automatisch eine "
+            "kleinere Gruppe wählen, wenn die Wunsch-Gruppe nicht "
+            "darstellbar ist, statt die Stunde komplett auszulassen."
+        ),
+    ),
+    Topic(
+        title="Wunschspieler / Mates",
+        keywords={
+            "wunschspieler", "wunschpartner", "mates", "mate", "passende spieler",
+            "spieler kombinieren", "wer passt zu", "zusammen trainieren",
+            "pflicht partner", "mandatory", "trainingspartner",
+        },
+        answer=(
+            "Jeder Spieler kann eine Liste von **Wunschspielern (Mates)** "
+            "haben, die vom Trainer kuratiert wird (Spieler-Liste → "
+            "Bearbeiten → 'Wunschspieler'). Pro Mate gibt es einen Schalter:\n"
+            "- **🔒 Pflicht**: hartes Constraint - die beiden Spieler "
+            "MÜSSEN in jeder Session zusammen sein. Wenn der Solver einen "
+            "nicht zuteilen kann, kann er auch den anderen nicht zuteilen.\n"
+            "- Ohne Schloss: weicher Bonus - der Solver bevorzugt diese "
+            "Kombination, ist aber frei, einen anderen passenden Spieler zu "
+            "wählen.\n\n"
+            "Mate-Beziehungen werden automatisch **symmetrisch gespiegelt**: "
+            "wenn A → B mandatory ist, gilt das auch in B's Mate-Liste. "
+            "Das ersetzt das alte 'Wunsch-Mitspieler'-Feld funktional und "
+            "ist genauer (mit Pflicht/optional-Unterschied)."
         ),
     ),
     Topic(
@@ -261,6 +360,60 @@ KNOWLEDGE: list[Topic] = [
         ),
     ),
     Topic(
+        title="Plan-Diagnose & automatische Lockerung",
+        keywords={
+            "diagnose", "warum geht das nicht", "warum klappt", "fallback",
+            "lockerung", "gelockert", "lockern", "relax", "warum nicht perfekt",
+            "warum funktioniert", "plan erklärung", "explanation", "warnungen",
+        },
+        answer=(
+            "Wenn der Solver keinen 'perfekten' Plan findet, gibt der Coach "
+            "Assistant nicht einfach auf - er versucht es in mehreren Stufen:\n\n"
+            "1. **Strict** - alle Constraints hart (LK, Mindestblock, Max-Stunden, "
+            "Min-Stunden).\n"
+            "2. **Min-Stunden weich** - Spieler dürfen weniger als ihr Minimum "
+            "bekommen, der Solver bestraft das aber stark.\n"
+            "3. + Max-Stunden weich - Trainer dürfen über ihr Tages-/Wochenlimit.\n"
+            "4. + Mindestblock weich - kürzere zusammenhängende Trainer-Blöcke "
+            "erlaubt (z.B. 1h statt geforderter 2h).\n"
+            "5. **Alles weich** inkl. LK-/Alters-Kompatibilität.\n\n"
+            "Der erste Tier, der Pläne liefert, gewinnt. In der **Erklärung** "
+            "oben auf der Plan-Detailseite siehst du:\n"
+            "- ✅ ob alle Vorgaben erfüllt sind, oder\n"
+            "- ⚠️ welche Constraints gelockert wurden, plus\n"
+            "- ℹ️ Hinweise aus dem Pre-Flight (z.B. 'Trainer X hat keine "
+            "Verfügbarkeit', 'Spieler Y hat keinen kompatiblen Trainer').\n\n"
+            "Tipp: Wenn dir die Lockerung nicht gefällt, kannst du den Plan "
+            "anschließend per **Bearbeiten-Modus** noch frei nachjustieren."
+        ),
+    ),
+    Topic(
+        title="Plan manuell bearbeiten / Drag and Drop",
+        keywords={
+            "manuell bearbeiten", "plan bearbeiten", "plan anpassen", "drag and drop",
+            "dragdrop", "verschieben", "manuell ändern", "editor", "session verschieben",
+            "session ändern", "session löschen", "neue session", "editieren",
+        },
+        answer=(
+            "Auf der Plan-Detailseite gibt es einen Button **'✏️ Plan manuell "
+            "bearbeiten'**. Im Editor kannst du:\n\n"
+            "- **Sessions verschieben** per Drag &amp; Drop direkt im Kalender. "
+            "Die Dauer bleibt erhalten, der Zielslot wird zum neuen Start.\n"
+            "- **Eine Session anklicken**, um sie in der Seitenleiste zu "
+            "bearbeiten: Trainer, Platz, Spieler (Mehrfachauswahl), Tag, "
+            "Startzeit und Dauer.\n"
+            "- **Neue Sessions** über den Button '+ Neue Session' anlegen.\n"
+            "- **Sessions löschen** über den 🗑-Button in der Seitenleiste.\n"
+            "- Mit **'💾 Speichern'** wird der Plan per PUT überschrieben. "
+            "Du bekommst Warnungen in der Plan-Erklärung, falls strukturelle "
+            "Konflikte entstehen (Trainer/Platz/Spieler doppelt belegt).\n\n"
+            "Wichtig: Im Editor werden **keine** weichen Constraints geprüft - "
+            "du hast volle Freiheit. Wunschtrainer, Mindeststunden, LK-Regeln "
+            "spielen hier keine Rolle mehr. Wenn du wieder eine automatische "
+            "Optimierung willst, lass einfach einen neuen Plan generieren."
+        ),
+    ),
+    Topic(
         title="Plan leer / infeasible",
         keywords={"infeasible", "leer", "keine sessions", "kein plan", "warum keine", "solver findet nichts", "unmöglich", "unmoeglich"},
         answer=(
@@ -273,8 +426,14 @@ KNOWLEDGE: list[Topic] = [
             "3. **Min-Stunden zu hoch** - Spieler verlangen mehr Stunden, "
             "als zusammen passen.\n"
             "4. **Plätze zu knapp** - zu wenige Courts für die Slot-Zahl.\n\n"
-            "Lösung: Reiter *Verfügbarkeiten* öffnen, Lücken füllen, "
-            "Min-Stunden senken oder zusätzlichen Platz/Trainer anlegen."
+            "Der Coach Assistant probiert seit dem letzten Update automatisch "
+            "eine Reihe **Fallback-Stufen** (Min-Stunden weich, dann Max-Stunden "
+            "weich, dann Mindestblock, dann LK). Welche Stufe gewonnen hat, "
+            "steht in der Plan-Erklärung oben auf der Detailseite. "
+            "Wenn auch der lockerste Modus nichts liefert, hilft nur: "
+            "Verfügbarkeiten füllen, Min-Stunden senken, zusätzlichen Platz "
+            "oder Trainer anlegen - oder den (leeren) Plan per Editor "
+            "manuell befüllen."
         ),
     ),
     Topic(
