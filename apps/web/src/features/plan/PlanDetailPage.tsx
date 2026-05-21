@@ -226,11 +226,12 @@ function SessionEditor({
       </aside>
     );
   }
+  const s: Session = session;
 
-  const startSlot = session.slot_indices[0] ?? 0;
+  const startSlot = s.slot_indices[0] ?? 0;
   const day = Math.floor(startSlot / SLOTS_PER_DAY);
   const localStart = startSlot % SLOTS_PER_DAY;
-  const duration = session.slot_indices.length;
+  const duration = s.slot_indices.length;
 
   function setStart(newDay: number, newLocal: number) {
     const base = newDay * SLOTS_PER_DAY + newLocal;
@@ -242,7 +243,7 @@ function SessionEditor({
 
   function setDuration(newDur: number) {
     if (newDur < 1) return;
-    const base = session.slot_indices[0];
+    const base = s.slot_indices[0];
     if (base === undefined) return;
     const dayEnd = (Math.floor(base / SLOTS_PER_DAY) + 1) * SLOTS_PER_DAY;
     const slots = Array.from({ length: newDur }, (_, i) => base + i);
@@ -252,11 +253,11 @@ function SessionEditor({
   }
 
   function togglePlayer(pid: string) {
-    const has = session.player_ids.includes(pid);
+    const has = s.player_ids.includes(pid);
     const next = has
-      ? session.player_ids.filter((x) => x !== pid)
-      : [...session.player_ids, pid];
-    let stype: string = session.session_type;
+      ? s.player_ids.filter((x) => x !== pid)
+      : [...s.player_ids, pid];
+    let stype: string = s.session_type;
     if (next.length <= 1) stype = "single";
     else if (next.length === 2) stype = "double";
     else stype = "group";
@@ -268,13 +269,13 @@ function SessionEditor({
       <h3 style={{ marginTop: 0 }}>Session bearbeiten</h3>
 
       <label style={lbl}>Trainer
-        <select value={session.coach_id} onChange={(e) => onChange({ coach_id: e.target.value })}>
+        <select value={s.coach_id} onChange={(e) => onChange({ coach_id: e.target.value })}>
           {coaches.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
 
       <label style={lbl}>Platz
-        <select value={session.court_id} onChange={(e) => onChange({ court_id: e.target.value })}>
+        <select value={s.court_id} onChange={(e) => onChange({ court_id: e.target.value })}>
           {courts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </label>
@@ -307,13 +308,13 @@ function SessionEditor({
       </p>
 
       <fieldset style={{ border: "1px solid #ddd", padding: 8, margin: "8px 0" }}>
-        <legend>Spieler ({session.player_ids.length})</legend>
+        <legend>Spieler ({s.player_ids.length})</legend>
         <div style={{ maxHeight: 200, overflowY: "auto" }}>
           {players.map((p) => (
             <label key={p.id} style={{ display: "block", fontSize: 12, padding: "2px 0" }}>
               <input
                 type="checkbox"
-                checked={session.player_ids.includes(p.id)}
+                checked={s.player_ids.includes(p.id)}
                 onChange={() => togglePlayer(p.id)}
               />
               {" "}{p.name}
