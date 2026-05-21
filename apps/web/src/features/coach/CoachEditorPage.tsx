@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
 import { AvailabilityGrid } from "../availability/AvailabilityGrid";
 import { SLOT_MINUTES } from "../../lib/timeGrid";
+import { LoginRequired, isAuthError } from "../../components/LoginRequired";
 
 type Coach = {
   id: string;
@@ -22,7 +23,8 @@ const hoursForSlots = (s: number | null) => (s == null ? "" : s * SLOT_MINUTES /
 
 export function CoachEditorPage() {
   const qc = useQueryClient();
-  const list = useQuery({ queryKey: ["coaches"], queryFn: () => api<Coach[]>("/coaches") });
+  const authed = isLoggedIn();
+  const list = useQuery({ queryKey: ["coaches"], queryFn: () => api<Coach[]>("/coaches"), enabled: authed });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Coach | null>(null);
 
@@ -46,8 +48,9 @@ export function CoachEditorPage() {
   return (
     <section>
       <h2>Trainer & Constraints</h2>
+      {!authed && <LoginRequired />}
       {list.isLoading && <p>lade...</p>}
-      {list.error && <p>Bitte einloggen.</p>}
+      {list.error && (isAuthError(list.error) ? <LoginRequired /> : <p style={{ color: "var(--color-danger, crimson)" }}>{(list.error as Error).message}</p>)}
       {list.data && (
         <label>
           Trainer:&nbsp;

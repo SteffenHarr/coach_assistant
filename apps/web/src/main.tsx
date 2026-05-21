@@ -22,7 +22,21 @@ import { PlansLayout, CoachLayout, PlayerLayout } from "./features/nav/Layouts";
 import { isLoggedIn, logout, api } from "./api/client";
 import "./index.css";
 
-const qc = new QueryClient();
+const qc = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Don't retry auth errors (401/403) — keeps the "please log in"
+      // message instant instead of waiting 10+ s for 3 retry attempts.
+      retry: (failureCount, error) => {
+        const status = (error as { status?: number })?.status;
+        if (status === 401 || status === 403) return false;
+        return failureCount < 2;
+      },
+      // Short retry delay; default exponential backoff was up to ~30 s.
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+    },
+  },
+});
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   "app-nav__link" + (isActive ? " app-nav__link--active" : "");
@@ -46,8 +60,19 @@ function AuthNavLink() {
             setRole(u.role);
             sessionStorage.setItem("user_role", u.role);
           })
-          // Network blip: keep the cached role rather than dropping nav items.
-          .catch(() => {});
+          .catch((err) => {
+            // 401/403 → token is invalid. `api()` has already wiped
+            // sessionStorage; reflect that locally so the button flips
+            // from "Abmelden" to "Anmelden" without waiting for the
+            // next 15s poll.
+            const status = (err as { status?: number })?.status;
+            if (status === 401 || status === 403) {
+              setAuthed(false);
+              setRole(null);
+            }
+            // Other network errors: keep the cached role to avoid
+            // dropping nav items on a transient blip.
+          });
       } else {
         setRole(null);
         sessionStorage.removeItem("user_role");

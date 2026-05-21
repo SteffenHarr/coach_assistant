@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
+import { LoginRequired } from "../../components/LoginRequired";
 
 type PlayerFull = {
   id: string;
@@ -17,13 +18,16 @@ type PlayerFull = {
 
 export function PlayerListPage() {
   const qc = useQueryClient();
+  const authed = isLoggedIn();
   const me = useQuery<{ role: string }>({
     queryKey: ["me"],
     queryFn: () => api<{ role: string }>("/me"),
+    enabled: authed,
   });
   const players = useQuery<PlayerFull[]>({
     queryKey: ["players-full"],
     queryFn: () => api<PlayerFull[]>("/players/full"),
+    enabled: authed,
   });
 
   const setLevel = useMutation({
@@ -37,6 +41,7 @@ export function PlayerListPage() {
 
   const canEditLevel = me.data?.role === "coach" || me.data?.role === "admin";
 
+  if (!authed) return <LoginRequired />;
   if (players.isLoading) return <p>Lädt…</p>;
 
   return (

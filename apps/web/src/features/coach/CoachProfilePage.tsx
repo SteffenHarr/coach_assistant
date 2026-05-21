@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
 import { AvailabilityGrid } from "../availability/AvailabilityGrid";
 import { NumberField } from "../../lib/NumberField";
 import { SLOT_MINUTES } from "../../lib/timeGrid";
+import { LoginRequired } from "../../components/LoginRequired";
 
 type ProfileResponse = {
   user: { role: string; email: string };
@@ -32,9 +33,11 @@ const hoursForSlots = (s: number | null | undefined): number | null =>
 
 export function CoachProfilePage() {
   const qc = useQueryClient();
+  const authed = isLoggedIn();
   const me = useQuery<ProfileResponse>({
     queryKey: ["me-profile"],
     queryFn: () => api<ProfileResponse>("/me/profile"),
+    enabled: authed,
   });
 
   const [name, setName] = useState("");
@@ -103,6 +106,7 @@ export function CoachProfilePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["me-profile"] }),
   });
 
+  if (!authed) return <LoginRequired />;
   if (me.isLoading) return <p>Lädt…</p>;
   if (me.data?.user.role !== "coach" && me.data?.user.role !== "admin")
     return (

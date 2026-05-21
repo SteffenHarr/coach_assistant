@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
 import { PlanCalendar } from "./PlanCalendar";
+import { LoginRequired, isAuthError } from "../../components/LoginRequired";
 
 type Session = {
   coach_id: string;
@@ -23,15 +24,16 @@ type Named = { id: string; name: string };
 
 export function PlanDetailPage() {
   const { planId } = useParams<{ planId: string }>();
+  const authed = isLoggedIn();
 
   const plan = useQuery({
     queryKey: ["plan", planId],
     queryFn: () => api<Plan>(`/plans/${planId}`),
-    enabled: !!planId,
+    enabled: !!planId && authed,
   });
-  const coaches = useQuery({ queryKey: ["coaches"], queryFn: () => api<Named[]>("/coaches") });
-  const players = useQuery({ queryKey: ["players"], queryFn: () => api<Named[]>("/players") });
-  const courts = useQuery({ queryKey: ["courts"], queryFn: () => api<Named[]>("/courts") });
+  const coaches = useQuery({ queryKey: ["coaches"], queryFn: () => api<Named[]>("/coaches"), enabled: authed });
+  const players = useQuery({ queryKey: ["players"], queryFn: () => api<Named[]>("/players"), enabled: authed });
+  const courts = useQuery({ queryKey: ["courts"], queryFn: () => api<Named[]>("/courts"), enabled: authed });
 
   const coachMap = Object.fromEntries((coaches.data ?? []).map((c) => [c.id, c.name]));
   const playerMap = Object.fromEntries((players.data ?? []).map((p) => [p.id, p.name]));
@@ -41,8 +43,9 @@ export function PlanDetailPage() {
     <section>
       <p><Link to="/">← zurück</Link></p>
       <h2>Plan {planId?.slice(0, 8)}</h2>
+      {!authed && <LoginRequired />}
       {plan.isLoading && <p>lade...</p>}
-      {plan.error && <p style={{ color: "crimson" }}>Fehler beim Laden.</p>}
+      {plan.error && (isAuthError(plan.error) ? <LoginRequired /> : <p style={{ color: "crimson" }}>Fehler beim Laden.</p>)}
       {plan.data && (
         <>
           <p>

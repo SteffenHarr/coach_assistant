@@ -19,6 +19,16 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     credentials: "same-origin",
   });
   if (!res.ok) {
+    // 401/403 → the session is no longer valid. Wipe local state
+    // immediately so the nav bar flips from "Abmelden" to "Anmelden"
+    // and downstream pages stop retrying.
+    if (res.status === 401 || res.status === 403) {
+      if (sessionStorage.getItem("access_token")) {
+        sessionStorage.removeItem("access_token");
+        sessionStorage.removeItem("user_role");
+        window.dispatchEvent(new StorageEvent("storage", { key: "access_token" }));
+      }
+    }
     // Try to extract a human-readable message from the API's standard
     // FastAPI error envelope ``{ "detail": "..." }`` or the field-level
     // validation envelope ``{ "detail": [ { msg, loc, ... } ] }``.
@@ -124,7 +134,16 @@ export async function postStream(
     credentials: "same-origin",
   });
   if (!res.ok || !res.body) {
-    throw new Error(`${res.status} ${res.statusText}`);
+    if (res.status === 401 || res.status === 403) {
+      if (sessionStorage.getItem("access_token")) {
+        sessionStorage.removeItem("access_token");
+        sessionStorage.removeItem("user_role");
+        window.dispatchEvent(new StorageEvent("storage", { key: "access_token" }));
+      }
+    }
+    const err = new Error(`${res.status} ${res.statusText}`);
+    (err as any).status = res.status;
+    throw err;
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");

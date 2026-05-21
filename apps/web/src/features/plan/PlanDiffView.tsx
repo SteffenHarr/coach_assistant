@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
+import { LoginRequired, isAuthError } from "../../components/LoginRequired";
 
 type Session = {
   coach_id: string;
@@ -54,7 +55,8 @@ export function PlanDiffView() {
         </button>
       </div>
 
-      {q.error && <p style={{ color: "crimson" }}>Fehler: {(q.error as Error).message}</p>}
+      {!isLoggedIn() && <LoginRequired />}
+      {q.error && (isAuthError(q.error) ? <LoginRequired /> : <p style={{ color: "crimson" }}>Fehler: {(q.error as Error).message}</p>)}
       {q.data && (
         <div>
           <p>

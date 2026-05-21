@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
 import { SLOT_MINUTES } from "../../lib/timeGrid";
+import { LoginRequired, isAuthError } from "../../components/LoginRequired";
 
 type CoachFull = {
   id: string;
@@ -33,14 +34,19 @@ function range(lo: number | null | undefined, hi: number | null | undefined, uni
 }
 
 export function CoachListPage() {
+  const authed = isLoggedIn();
   const coaches = useQuery<CoachFull[]>({
     queryKey: ["coaches-full"],
     queryFn: () => api<CoachFull[]>("/coaches/full"),
+    enabled: authed,
   });
 
+  if (!authed) return <LoginRequired />;
   if (coaches.isLoading) return <p>Lädt…</p>;
   if (coaches.error)
-    return (
+    return isAuthError(coaches.error) ? (
+      <LoginRequired />
+    ) : (
       <p style={{ color: "var(--color-danger)" }}>
         {(coaches.error as Error).message}
       </p>

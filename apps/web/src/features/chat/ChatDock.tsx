@@ -78,9 +78,11 @@ export function ChatDock() {
       }
     } catch (e) {
       const msg = (e as Error).message;
-      const friendly = msg.startsWith("401")
-        ? "Du bist nicht angemeldet. Bitte klicke oben rechts auf 'Anmelden' und logge dich ein."
-        : "Fehler: " + msg;
+      const status = (e as { status?: number }).status;
+      const friendly =
+        status === 401 || status === 403 || msg.startsWith("401") || msg.startsWith("403")
+          ? "Du bist nicht angemeldet. Bitte klicke oben rechts auf 'Anmelden' und logge dich ein."
+          : "Fehler: " + msg;
       setHistory([...baseHistory, { role: "assistant", content: friendly }]);
     } finally {
       setBusy(false);
@@ -141,17 +143,19 @@ export function ChatDock() {
           {history.length === 0 && (
             <div className="chatdock__empty">
               <p className="muted">
-                Hi! Ich bin dein Coach-Assistent. Ich kenne deine Trainer,
-                Spieler, Plätze, Verfügbarkeiten und Pläne und kann dir das
-                Programm erklären.
+                Hi! Ich bin dein Coach-Assistent. Frag mich nach Daten oder
+                wie das Programm funktioniert — Antworten kommen sofort.
               </p>
               <p className="muted" style={{ fontSize: "var(--text-xs)" }}>
                 Beispiele:
               </p>
               <ul className="clean" style={{ fontSize: "var(--text-xs)" }}>
                 <li>{'• "Welche Trainer haben wir?"'}</li>
-                <li>{'• "Erstelle 3 Plan-Varianten für Saison Sommer 2026."'}</li>
-                <li>{'• "Wie funktioniert der Saisonwechsel?"'}</li>
+                <li>{'• "Welche Spieler haben wir?"'}</li>
+                <li>{'• "Wie funktioniert der Solver?"'}</li>
+                <li>{'• "Wie lege ich einen Spieler an?"'}</li>
+                <li>{'• "Was bedeutet LK?"'}</li>
+                <li>{'• "hilfe" für die volle Themen-Liste'}</li>
               </ul>
             </div>
           )}

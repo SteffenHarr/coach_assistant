@@ -343,42 +343,41 @@ async def diff_two_plans(
 @router.post("/chat", response_model=ChatResponse)
 async def chat(
     data: ChatRequest,
-    request: Request,
+    db: AsyncSession = Depends(get_db),
     user: UserORM = Depends(current_active_user),
 ) -> ChatResponse:
-    # Lazy import — avoids loading heavy LLM client unless used.
-    from coach_api.infrastructure.agent import build_agent, chat_once
+    """Deterministic, rule-based chat assistant — no LLM.
 
-    bearer = request.headers.get("authorization", "").removeprefix("Bearer ").strip() or None
-    api_base = str(request.base_url).rstrip("/")
-    agent = build_agent(api_base=api_base, bearer=bearer)
-    history = [m.model_dump() for m in data.history]
-    reply = chat_once(agent, data.message, history)
+    Answers from a static knowledge base and live DB queries via keyword
+    matching. Sub-10ms response time, no GPU/CPU spike.
+    """
+    from coach_api.infrastructure.bot import answer
+
+    reply = await answer(data.message, db)
     return ChatResponse(reply=reply)
 
 
 @router.post("/chat/stream")
 async def chat_stream_endpoint(
     data: ChatRequest,
-    request: Request,
+    db: AsyncSession = Depends(get_db),
     user: UserORM = Depends(current_active_user),
 ):
-    """Streaming chat endpoint — yields plain text chunks as the LLM
-    produces them. The frontend reads the response body as a stream and
-    appends each chunk to the current assistant bubble for near-zero
-    perceived latency."""
+    """Streaming variant of the chat endpoint. The bot computes the full
+    answer instantly; we still stream so the frontend can use a single
+    code path for both the legacy LLM agent and the new bot."""
     from fastapi.responses import StreamingResponse
 
-    from coach_api.infrastructure.agent import build_agent, chat_stream
+    from coach_api.infrastructure.bot import answer
 
-    bearer = request.headers.get("authorization", "").removeprefix("Bearer ").strip() or None
-    api_base = str(request.base_url).rstrip("/")
-    agent = build_agent(api_base=api_base, bearer=bearer)
-    history = [m.model_dump() for m in data.history]
+    reply = await answer(data.message, db)
 
     async def gen():
-        async for token in chat_stream(agent, data.message, history):
-            yield token
+        # Yield the reply in small chunks for a slight typewriter effect —
+        # purely cosmetic, total wall-time is still sub-10ms.
+        chunk_size = 80
+        for i in range(0, len(reply), chunk_size):
+            yield reply[i : i + chunk_size]
 
     return StreamingResponse(
         gen(),

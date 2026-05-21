@@ -1,21 +1,26 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
+import { LoginRequired, isAuthError } from "../../components/LoginRequired";
 
 type Season = { id: string; name: string; valid_from: string; valid_to: string };
 type Plan = { id: string; season_id: string; score: number; sessions: any[] };
 
 export function PlansPage() {
+  const authed = isLoggedIn();
   const seasons = useQuery({
     queryKey: ["seasons"],
     queryFn: () => api<Season[]>("/seasons"),
+    enabled: authed,
   });
+
+  if (!authed) return <LoginRequired />;
 
   return (
     <section>
       <h2>Trainingspläne</h2>
       {seasons.isLoading && <p>lade...</p>}
-      {seasons.error && <p>Bitte einloggen.</p>}
+      {seasons.error && (isAuthError(seasons.error) ? <LoginRequired /> : <p style={{ color: "var(--color-danger, crimson)" }}>{(seasons.error as Error).message}</p>)}
       {seasons.data && seasons.data.length === 0 && (
         <p>Noch keine Saison angelegt.</p>
       )}

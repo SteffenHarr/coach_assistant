@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
 import { AvailabilityGrid } from "../availability/AvailabilityGrid";
 import { NumberField } from "../../lib/NumberField";
+import { LoginRequired } from "../../components/LoginRequired";
 
 type Coach = { id: string; name: string };
 type Player = { id: string; name: string };
@@ -28,17 +29,21 @@ type ProfileResponse = {
 
 export function PlayerProfilePage() {
   const qc = useQueryClient();
+  const authed = isLoggedIn();
   const me = useQuery<ProfileResponse>({
     queryKey: ["me-profile"],
     queryFn: () => api<ProfileResponse>("/me/profile"),
+    enabled: authed,
   });
   const coaches = useQuery<Coach[]>({
     queryKey: ["coaches"],
     queryFn: () => api<Coach[]>("/coaches"),
+    enabled: authed,
   });
   const players = useQuery<Player[]>({
     queryKey: ["players"],
     queryFn: () => api<Player[]>("/players"),
+    enabled: authed,
   });
 
   const [name, setName] = useState("");
@@ -84,6 +89,7 @@ export function PlayerProfilePage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["me-profile"] }),
   });
 
+  if (!authed) return <LoginRequired />;
   if (me.isLoading) return <p>Lädt…</p>;
 
   const lk = me.data?.player?.preferences.level_lk ?? null;

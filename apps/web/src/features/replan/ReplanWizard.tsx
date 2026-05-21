@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
+import { LoginRequired } from "../../components/LoginRequired";
 
 type Season = { id: string; name: string; valid_from: string; valid_to: string };
 type Plan = { id: string; season_id: string; score: number; sessions: any[] };
@@ -10,10 +11,11 @@ type Step = 0 | 1 | 2 | 3;
 
 export function ReplanWizard() {
   const qc = useQueryClient();
+  const authed = isLoggedIn();
   const [step, setStep] = useState<Step>(0);
 
   // Step 0: pick previous season (for diff baseline)
-  const seasons = useQuery({ queryKey: ["seasons"], queryFn: () => api<Season[]>("/seasons") });
+  const seasons = useQuery({ queryKey: ["seasons"], queryFn: () => api<Season[]>("/seasons"), enabled: authed });
   const [previousSeasonId, setPreviousSeasonId] = useState<string>("");
 
   // Step 1: create new season
@@ -55,8 +57,10 @@ export function ReplanWizard() {
   const baseline = useQuery({
     queryKey: ["best-plan", previousSeasonId],
     queryFn: () => api<Plan | null>(`/seasons/${previousSeasonId}/best-plan`),
-    enabled: !!previousSeasonId && step === 3,
+    enabled: !!previousSeasonId && step === 3 && authed,
   });
+
+  if (!authed) return <LoginRequired />;
 
   return (
     <section>

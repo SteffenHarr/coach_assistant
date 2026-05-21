@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
 import { AvailabilityGrid } from "./AvailabilityGrid";
+import { LoginRequired, isAuthError } from "../../components/LoginRequired";
 
 type Coach = {
   id: string;
@@ -36,6 +37,7 @@ type Subject = "coach" | "player" | "court";
 export function AvailabilityPage() {
   const [subject, setSubject] = useState<Subject>("coach");
   const qc = useQueryClient();
+  const authed = isLoggedIn();
 
   const list = useQuery({
     queryKey: [subject + "s"],
@@ -44,6 +46,7 @@ export function AvailabilityPage() {
       if (subject === "player") return api<Player[]>("/players");
       return api<Court[]>("/courts");
     },
+    enabled: authed,
   });
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -96,8 +99,9 @@ export function AvailabilityPage() {
         ))}
       </div>
 
+      {!authed && <LoginRequired />}
       {list.isLoading && <p>lade...</p>}
-      {list.error && <p>Bitte einloggen.</p>}
+      {list.error && (isAuthError(list.error) ? <LoginRequired /> : <p style={{ color: "var(--color-danger, crimson)" }}>{(list.error as Error).message}</p>)}
       {list.data && list.data.length === 0 && (
         <p>Noch keine Einträge angelegt.</p>
       )}

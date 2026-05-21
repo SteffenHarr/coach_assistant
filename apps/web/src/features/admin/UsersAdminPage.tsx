@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { api, isLoggedIn } from "../../api/client";
+import { LoginRequired } from "../../components/LoginRequired";
 
 type User = {
   id: string;
@@ -13,9 +14,11 @@ type User = {
 
 export function UsersAdminPage() {
   const qc = useQueryClient();
+  const authed = isLoggedIn();
   const me = useQuery<User>({
     queryKey: ["me"],
     queryFn: () => api<User>("/me"),
+    enabled: authed,
   });
 
   const users = useQuery<User[]>({
@@ -60,6 +63,7 @@ export function UsersAdminPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["users"] }),
   });
 
+  if (!authed) return <LoginRequired />;
   if (me.isLoading) return <p>Lädt…</p>;
   if (me.data?.role !== "admin")
     return (
