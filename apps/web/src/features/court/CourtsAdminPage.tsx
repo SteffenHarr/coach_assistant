@@ -3,12 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isLoggedIn } from "../../api/client";
 import { AvailabilityGrid } from "../availability/AvailabilityGrid";
 import { LoginRequired, isAuthError } from "../../components/LoginRequired";
+import { sortCourts } from "../../lib/sortCourts";
 
 type Court = {
   id: string;
   name: string;
   availability: number[];
   indoor: boolean;
+  priority: number;
 };
 
 const SLOTS_PER_WEEK = 7 * 48; // 30-Min-Raster, 7 Tage
@@ -50,10 +52,12 @@ export function CourtsAdminPage() {
           name: c.name,
           availability: c.availability,
           indoor: c.indoor,
+          priority: c.priority,
         }),
       }),
     onSuccess: async (saved) => {
       setCreating(false);
+      qc.setQueryData<Court[]>(["courts"], (old) => [...(old ?? []), saved]);
       await qc.invalidateQueries({ queryKey: ["courts"] });
       setSelectedId(saved.id);
     },
@@ -67,6 +71,7 @@ export function CourtsAdminPage() {
           name: c.name,
           availability: c.availability,
           indoor: c.indoor,
+          priority: c.priority,
         }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["courts"] }),
@@ -88,11 +93,11 @@ export function CourtsAdminPage() {
     return isAuthError(list.error) ? (
       <LoginRequired />
     ) : (
-      <p style={{ color: "crimson" }}>{(list.error as Error).message}</p>
+      <p style={{ color: "var(--color-danger)" }}>{(list.error as Error).message}</p>
     );
   }
 
-  const courts = list.data ?? [];
+  const courts = sortCourts(list.data ?? []);
   const saving = create.isPending || update.isPending;
 
   return (
@@ -105,6 +110,7 @@ export function CourtsAdminPage() {
             <tr>
               <th>Name</th>
               <th>Halle</th>
+              <th title="Solver bevorzugt bei sonst gleichwertiger Wahl den Platz mit der niedrigeren Zahl (0 = am liebsten), getrennt für Halle/Draußen.">Priorität</th>
               <th>Verfügbar (Stunden / Woche)</th>
               <th></th>
             </tr>
@@ -114,15 +120,17 @@ export function CourtsAdminPage() {
               <tr
                 key={c.id}
                 style={{
-                  background: c.id === selectedId && !creating ? "#eef" : undefined,
+                  background: c.id === selectedId && !creating ? "var(--color-primary-soft)" : undefined,
                 }}
               >
                 <td>{c.name}</td>
                 <td>{c.indoor ? "ja" : "nein"}</td>
+                <td>{c.priority}</td>
                 <td>{(c.availability.length * 30) / 60}</td>
-                <td>
+                <td className="table-actions">
                   <button
                     type="button"
+                    className="btn--secondary"
                     onClick={() => {
                       setCreating(false);
                       setSelectedId(c.id);
@@ -130,9 +138,9 @@ export function CourtsAdminPage() {
                   >
                     Bearbeiten
                   </button>
-                  &nbsp;
                   <button
                     type="button"
+                    className="btn--danger"
                     onClick={() => {
                       if (confirm(`Platz "${c.name}" wirklich löschen?`)) {
                         remove.mutate(c.id);
@@ -147,7 +155,7 @@ export function CourtsAdminPage() {
             ))}
             {courts.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ color: "#666" }}>
+                <td colSpan={5} style={{ color: "var(--color-text-muted)" }}>
                   Noch keine Plätze angelegt.
                 </td>
               </tr>
@@ -165,13 +173,14 @@ export function CourtsAdminPage() {
                 name: "",
                 availability: allWeekSlots(),
                 indoor: false,
+                priority: 0,
               });
             }}
           >
             + Neuer Platz
           </button>
           {remove.error && (
-            <span style={{ color: "crimson", marginLeft: 12 }}>
+            <span style={{ color: "var(--color-danger)", marginLeft: 12 }}>
               Löschen fehlgeschlagen: {(remove.error as Error).message}
             </span>
           )}
@@ -199,7 +208,7 @@ export function CourtsAdminPage() {
             <h3>Stammdaten</h3>
             <div style={{ display: "grid", gap: 10 }}>
               <label>
-                Name<br />
+                Name
                 <input
                   type="text"
                   value={draft.name}
@@ -207,13 +216,28 @@ export function CourtsAdminPage() {
                   style={{ width: "100%" }}
                 />
               </label>
-              <label>
+              <label className="label--inline">
                 <input
                   type="checkbox"
                   checked={draft.indoor}
                   onChange={(e) => setDraft({ ...draft, indoor: e.target.checked })}
                 />
-                &nbsp;Halle (indoor)
+                Halle (indoor)
+              </label>
+              <label>
+                Priorität
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={draft.priority}
+                  onChange={(e) => setDraft({ ...draft, priority: Number(e.target.value) })}
+                  style={{ width: "100%" }}
+                />
+                <span className="muted" style={{ fontSize: 12, display: "block", marginTop: 2 }}>
+                  0 = wird bevorzugt. Nur ein weicher Tie-Breaker (getrennt für Halle/Draußen) —
+                  echte Nachfrage wiegt immer schwerer.
+                </span>
               </label>
             </div>
 
@@ -241,7 +265,7 @@ export function CourtsAdminPage() {
               )}
             </div>
             {(create.error || update.error) && (
-              <p style={{ color: "crimson" }}>
+              <p style={{ color: "var(--color-danger)" }}>
                 Speichern fehlgeschlagen:{" "}
                 {((create.error || update.error) as Error).message}
               </p>

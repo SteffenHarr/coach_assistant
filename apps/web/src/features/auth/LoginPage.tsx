@@ -17,7 +17,7 @@ export function LoginPage() {
       await login(email, password);
       nav("/");
     } catch (e) {
-      setErr("Login fehlgeschlagen.");
+      setErr((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -26,7 +26,7 @@ export function LoginPage() {
   return (
     <section style={{ maxWidth: 360 }}>
       <h2>Anmeldung</h2>
-      <form onSubmit={submit} style={{ display: "grid", gap: 8 }}>
+      <form onSubmit={submit} style={{ display: "grid", gap: "var(--space-3)" }}>
         <input
           type="email"
           placeholder="E-Mail"
@@ -45,9 +45,13 @@ export function LoginPage() {
           autoComplete="current-password"
         />
         <button type="submit" disabled={busy}>
-          {busy ? "..." : "Anmelden"}
+          {busy ? "Anmelden…" : "Anmelden"}
         </button>
-        {err && <p style={{ color: "crimson" }}>{err}</p>}
+        {err && (
+          <p style={{ color: "var(--color-danger)", margin: 0, fontSize: "var(--text-sm)" }}>
+            {err}
+          </p>
+        )}
       </form>
     </section>
   );

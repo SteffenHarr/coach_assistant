@@ -81,7 +81,7 @@ KNOWLEDGE: list[Topic] = [
             "- 'Was bedeutet LK?', 'Was ist Spielstärke?'\n"
             "- 'Was ist die Trainings-Kategorie?'\n"
             "- 'Was sind Gruppengrößen?'\n"
-            "- 'Was sind Trainings-Einheiten / Lessons?'\n"
+            "- 'Was bedeuten Einzel/Zweier/Gruppentraining?'\n"
             "- 'Was sind Wunschspieler / Mates?'\n\n"
             "**Verfügbarkeit & Profil**\n"
             "- 'Wie ändere ich meine Verfügbarkeit?'\n"
@@ -121,34 +121,36 @@ KNOWLEDGE: list[Topic] = [
             "Boni** - Spieler außerhalb des Bereichs können trotzdem "
             "zugeteilt werden, wenn sonst keine Lösung möglich wäre.\n"
             "- Das **einzige harte Filterkriterium** zwischen Trainer und "
-            "Spieler ist die **Trainings-Kategorie** (Kinder/Jugend/"
-            "Erwachsene/Mannschaft/Frei) - siehe Hilfe-Thema *Trainings-"
-            "Kategorie*.\n"
+            "Spieler ist die **Trainings-Kategorie** (Ballschule/U8-U18/"
+            "Erwachsene/Mannschaft/Förderkader/Frei) - siehe Hilfe-Thema "
+            "*Trainings-Kategorie*.\n"
             "- Die eigentliche Spieler/Trainer-Paarung sollte über "
             "**Wunschspieler** (Mates, pro Spieler vom Trainer kuratiert) "
-            "und **Trainings-Einheiten** (Lessons, pro Spieler) gesteuert "
-            "werden - siehe entsprechende Hilfe-Themen."
+            "und die **Einzel/Zweier/Gruppentraining-Checkboxen** pro "
+            "Spieler gesteuert werden - siehe entsprechende Hilfe-Themen."
         ),
     ),
     Topic(
         title="Trainings-Kategorie",
         keywords={
             "kategorie", "kategorien", "trainings-kategorie", "trainingskategorie",
-            "kindertraining", "jugendtraining", "erwachsenentraining",
-            "mannschaftstraining", "frei", "kids", "youth", "adults", "team", "open",
-            "kinder", "jugend", "erwachsene", "mannschaft",
+            "ballschule", "foerderkader", "förderkader", "erwachsenentraining",
+            "mannschaftstraining", "frei", "zwerge", "kleinkinder",
+            "adults", "team", "foerderkader", "ballschule", "u8", "u9", "u10", "u12", "u15", "u18", "open",
+            "erwachsene", "mannschaft",
         },
         answer=(
             "**Trainings-Kategorien** sind das einzige harte Filter zwischen "
             "Trainer und Spieler:\n\n"
-            "- `kids` / Kinder\n"
-            "- `youth` / Jugend\n"
+            "- `ballschule` / Ballschule (die Allerkleinsten, jünger als U8)\n"
+            "- `u8` / U8 (= \"Zwerge\")\n"
+            "- `u9`, `u10`, `u12`, `u15`, `u18`\n"
             "- `adults` / Erwachsene\n"
-            "- `team` / Mannschaft\n\n"
+            "- `team` / Mannschaft\n"
+            "- `foerderkader` / Förderkader\n\n"
             "**Pro Spieler** *und* **pro Trainer** kann jeweils eine *Menge* "
-            "an Kategorien gepflegt werden (z.B. ein 17-Jähriger im "
-            "Jugend- *und* Mannschaftstraining; ein Trainer, der Kinder *und* "
-            "Jugend übernimmt).\n\n"
+            "an Kategorien gepflegt werden (z.B. ein Spieler in U15 *und* "
+            "Förderkader; ein Trainer, der U10 *und* U12 übernimmt).\n\n"
             "**Solver-Regeln (hart):**\n"
             "- Leere Spieler- oder Trainer-Kategorienliste = *nicht "
             "zugewiesen* = Wildcard (passt zu allem).\n"
@@ -158,8 +160,19 @@ KNOWLEDGE: list[Topic] = [
             "- **Zusätzlich**: zwei Spieler dürfen nur dann in derselben "
             "Gruppen-Session sein, wenn ihre Kategorien sich schneiden "
             "*oder* mindestens einer von beiden keine Kategorien gesetzt "
-            "hat. So landen Kinder nicht mit Erwachsenen in einer Gruppe, "
-            "auch wenn beide demselben Trainer zugewiesen sind.\n\n"
+            "hat. So landen U8-Kinder nicht mit Erwachsenen in einer Gruppe, "
+            "auch wenn beide demselben Trainer zugewiesen sind.\n"
+            "- **Ausnahme `ballschule` und `u8` (\"Zwerge\")**: für die "
+            "jüngsten Kinder gilt die Wildcard-Ausnahme *unter Spielern* "
+            "nicht — ein Ballschule- oder U8-Kind trainiert ausschließlich "
+            "mit anderen Kindern derselben dieser beiden Kategorien, auch "
+            "nicht mit einem noch nicht kategorisierten Spieler (und auch "
+            "nicht Ballschule mit U8 gemischt). Solche Gruppen dürfen "
+            "außerdem bis zu **8 Kinder** pro Platz haben statt der sonst "
+            "üblichen 4. Ein Trainer *ohne* gesetzte Kategorie darf "
+            "Ballschule/U8 trotzdem ganz normal übernehmen — die "
+            "Wildcard-Ausnahme gilt weiterhin für die Trainer-Zuteilung, "
+            "nur nicht für die Zusammensetzung der Kindergruppe selbst.\n\n"
             "Pflege:\n"
             "- Spieler: Reiter *Spieler -> Liste*, Toggle-Buttons in der "
             "Spalte *Kategorie*.\n"
@@ -171,27 +184,31 @@ KNOWLEDGE: list[Topic] = [
         ),
     ),
     Topic(
-        title="Trainings-Einheiten / Lessons",
+        title="Trainingsform-Checkboxen",
         keywords={
             "lessons", "einheiten", "trainings-einheiten", "trainingseinheit",
             "stunden pro woche", "wieviele stunden", "wie viele stunden",
             "wochenstunden", "gruppengröße pro stunde", "gruppengroesse",
+            "einzel", "zweier", "gruppentraining", "trainingsform",
         },
         answer=(
-            "Pro Spieler kann der Trainer in der **Spieler-Liste** "
-            "(Bearbeiten) eine Liste von Trainings-Einheiten pflegen. "
-            "Jede Einheit hat:\n"
-            "- **Dauer** (30 Min bis 3 Stunden, in 30-Min-Schritten),\n"
-            "- **Gruppengröße** (1 = Einzel, 2 = Doppel, 3+ = Gruppe).\n\n"
-            "Beispiel: '60 Min Einzel + 60 Min 4er-Gruppe' = 2 Einheiten.\n\n"
+            "Jeder Spieler hat drei Checkboxen: **Einzel**, **Zweier**, "
+            "**Gruppentraining** — die Spieler dürfen diese selbst in ihrem "
+            "Profil setzen, Trainer/Admin können sie auch für andere ändern.\n\n"
             "Wirkung:\n"
-            "- `min_slots_per_week` des Spielers wird automatisch auf die "
-            "Summe der Dauern gesetzt.\n"
-            "- Der Solver bekommt **einen Bonus** wenn die tatsächliche "
-            "Gruppengröße im Plan einer der Wunschgrößen entspricht und "
-            "**eine Strafe**, wenn nicht. Er wird also automatisch eine "
-            "kleinere Gruppe wählen, wenn die Wunsch-Gruppe nicht "
-            "darstellbar ist, statt die Stunde komplett auszulassen."
+            "- Die tatsächliche Wochenstunden-Menge kommt weiterhin aus "
+            "**Min/Max Std/Woche** (harte Grenze für den Solver).\n"
+            "- Die Checkboxen steuern nur, in welcher **Gruppengröße** "
+            "diese Stunden stattfinden sollen: Einzel=1, Zweier=2, "
+            "Gruppentraining=3-4 Spieler. Der Solver bekommt einen Bonus, "
+            "wenn die tatsächliche Gruppengröße einer angehakten Form "
+            "entspricht, und eine Strafe, wenn nicht.\n"
+            "- Alle drei angehakt (Standard) = keine Präferenz — der "
+            "Solver ist bei der Gruppengröße frei.\n\n"
+            "Der Solver plant grundsätzlich **maximal 4 Spieler pro "
+            "Platz/Slot** ein, unabhängig von der Trainer-Einstellung "
+            "'Max. Gruppe'. Planer können danach im Plan-Editor manuell "
+            "weitere Spieler zu einer Session hinzufügen."
         ),
     ),
     Topic(
@@ -235,11 +252,19 @@ KNOWLEDGE: list[Topic] = [
         answer=(
             "Eine **Gruppe** ist die Teilnehmerzahl einer Session.\n"
             "- 1 = Einzeltraining\n"
-            "- 2 = Doppel-/Zweier-Gruppe\n"
+            "- 2 = 2er Training\n"
             "- 3-4 = klassisches Gruppentraining\n\n"
             "Jeder Trainer hat in seinem Profil ein `max_group_size` (z.B. 4). "
-            "Der Solver darf für diesen Trainer keine Gruppe größer als "
-            "`max_group_size` planen."
+            "Der Solver plant aber grundsätzlich **nie mehr als 4 Spieler "
+            "pro Platz/Slot** ein, egal was `max_group_size` sagt — die "
+            "Trainer-Einstellung wirkt sich nur noch nach unten aus (kleiner "
+            "als 4 ist möglich, größer nicht). Planer können danach im "
+            "Plan-Editor manuell weitere Spieler hinzufügen, wenn das im "
+            "Einzelfall gewünscht ist.\n\n"
+            "**Ausnahme:** Sessions, die ausschließlich aus Kindern der "
+            "Kategorie `ballschule` oder `u8` (\"Zwerge\") bestehen, dürfen "
+            "bis zu **8 Kinder** pro Platz haben — siehe Hilfe-Thema "
+            "*Trainings-Kategorie*."
         ),
     ),
     Topic(

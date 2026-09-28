@@ -6,12 +6,12 @@ from response models by construction.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
 from fastapi_users import schemas as fa_schemas
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from coach_api.domain.entities import SessionType, TrainingCategory
 
@@ -33,8 +33,14 @@ class UserCreate(fa_schemas.BaseUserCreate):
 
 
 class UserUpdate(fa_schemas.BaseUserUpdate):
+    # No ``role`` field here on purpose: this schema backs fastapi-users'
+    # generic ``PATCH /users/me`` (self-service) and ``PATCH /users/{id}``
+    # routes. fastapi-users' safe-mode update only strips its own hardcoded
+    # fields (is_superuser/is_active/is_verified) from self-service updates,
+    # not custom ones — a ``role`` field here would let any authenticated
+    # user PATCH their own role. Role changes go exclusively through
+    # ``PATCH /admin/users/{user_id}`` (admin-only, see routers.py).
     password: str | None = Field(default=None, min_length=12, max_length=128)
-    role: str | None = None
 
 
 # ---------- Admin user management ----------
@@ -45,7 +51,12 @@ class AdminUserCreate(BaseModel):
 
     email: EmailStr
     password: str = Field(min_length=12, max_length=128)
-    role: str = Field(default="player", pattern="^(admin|coach|player)$")
+    role: str = Field(default="player", pattern="^(admin|planner|coach|player)$")
+
+
+class LinkedRecordOut(BaseModel):
+    id: UUID
+    name: str
 
 
 class AdminUserOut(BaseModel):
@@ -56,10 +67,22 @@ class AdminUserOut(BaseModel):
     is_active: bool
     is_verified: bool
     is_superuser: bool
+    is_protected: bool = False
+    privacy_accepted_at: datetime | None = None
+    # Ein Konto darf mehrere Spieler verknüpft haben ("Familien-Account",
+    # z.B. eine Mutter, die mehrere Kinder verwaltet) — Trainer bleiben
+    # bewusst 1:1, siehe ``linked_coach_id``.
+    linked_players: list[LinkedRecordOut] = Field(default_factory=list)
+    linked_coach_id: UUID | None = None
+    linked_coach_name: str | None = None
 
 
 class AdminUserPatch(BaseModel):
-    role: str | None = Field(default=None, pattern="^(admin|coach|player)$")
+    # No ``is_protected`` field here on purpose — it must never be settable
+    # through the API (see UserORM.is_protected), only directly in the
+    # database, so no admin can un-protect a protected account.
+    email: EmailStr | None = None
+    role: str | None = Field(default=None, pattern="^(admin|planner|coach|player)$")
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=12, max_length=128)
 
@@ -83,6 +106,26 @@ class CoachConstraintsIn(BaseModel):
     accepts_age_min: int | None = Field(None, ge=3, le=120)
     accepts_age_max: int | None = Field(None, ge=3, le=120)
 
+    @model_validator(mode="after")
+    def _check_ranges(self) -> "CoachConstraintsIn":
+        if self.max_slots_per_day is not None and self.min_block_slots > self.max_slots_per_day:
+            raise ValueError("Mindest-Block darf nicht größer als Max Std/Tag sein")
+        if self.max_break_slots is not None and self.min_break_slots > self.max_break_slots:
+            raise ValueError("Mindest-Pause darf nicht größer als Max-Pause sein")
+        if (
+            self.accepts_lk_min is not None
+            and self.accepts_lk_max is not None
+            and self.accepts_lk_min > self.accepts_lk_max
+        ):
+            raise ValueError("LK-Minimum darf nicht größer als LK-Maximum sein")
+        if (
+            self.accepts_age_min is not None
+            and self.accepts_age_max is not None
+            and self.accepts_age_min > self.accepts_age_max
+        ):
+            raise ValueError("Alter-Minimum darf nicht größer als Alter-Maximum sein")
+        return self
+
 
 class CoachIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -102,6 +145,10 @@ class CoachIn(BaseModel):
 
 class CoachOut(CoachIn):
     id: UUID
+    has_account: bool = False
+    # Pausiert-Schalter (liegt in constraints JSON) — wird mit ausgeliefert,
+    # damit Listen/Filter im Frontend danach filtern können.
+    active: bool = True
 
 
 # ---------- Player ----------
@@ -114,7 +161,12 @@ class PlayerPreferencesIn(BaseModel):
         default_factory=lambda: list(SessionType)
     )
     # New profile metadata (stored in the same JSON column — solver ignores).
+    # ``age`` is only a fallback for players without a ``birth_date`` (e.g.
+    # admin-managed players without their own login). Once ``birth_date`` is
+    # set, the server recomputes ``age`` from it on every read and this
+    # field is ignored on write.
     age: int | None = Field(None, ge=3, le=120)
+    birth_date: date | None = None
     # Level on the German LK scale (1 = Profi, 25 = absolute Anfänger).
     # Only writable by coaches/admins (enforced in the route handler).
     level_lk: int | None = Field(None, ge=1, le=25)
@@ -128,18 +180,16 @@ class PlayerIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     availability: list[int] = Field(default_factory=list)
     preferences: PlayerPreferencesIn = Field(default_factory=PlayerPreferencesIn)
-    min_slots_per_week: int = Field(0, ge=0, le=48)
-    max_slots_per_week: int = Field(4, ge=0, le=48)
+    min_slots_per_week: int = Field(2, ge=0, le=48)  # = 1 Std
+    max_slots_per_week: int = Field(2, ge=0, le=48)  # = 1 Std
     categories: list[TrainingCategory] = Field(default_factory=list)
-    lessons: list["LessonIn"] = Field(default_factory=list)
     mates: list["PlayerMateIn"] = Field(default_factory=list)
 
-
-class LessonIn(BaseModel):
-    """Eine gewünschte Trainingseinheit pro Woche."""
-
-    duration_slots: int = Field(ge=1, le=12)   # 1..12 Slots = 30..360 Min
-    group_size: int = Field(ge=1, le=8)
+    @model_validator(mode="after")
+    def _check_min_max(self) -> "PlayerIn":
+        if self.min_slots_per_week > self.max_slots_per_week:
+            raise ValueError("Min Std/Woche darf nicht größer als Max Std/Woche sein")
+        return self
 
 
 class PlayerMateIn(BaseModel):
@@ -151,6 +201,9 @@ class PlayerMateIn(BaseModel):
 
 class PlayerOut(PlayerIn):
     id: UUID
+    has_account: bool = False
+    # Pausiert-Schalter (liegt in preferences JSON) — siehe CoachOut.active.
+    active: bool = True
 
 
 PlayerIn.model_rebuild()
@@ -163,6 +216,9 @@ class CourtIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     availability: list[int] = Field(default_factory=list)
     indoor: bool = False
+    # Solver-Präferenz innerhalb Halle/Draußen: 0 = am liebsten. Nur ein
+    # weicher Tie-Breaker, siehe domain.entities.Court.
+    priority: int = Field(0, ge=0, le=99)
 
 
 class CourtOut(CourtIn):
@@ -195,6 +251,18 @@ class TrainingSessionOut(BaseModel):
     player_ids: list[UUID]
     slot_indices: list[int]
     session_type: SessionType
+    # Freitext statt Spielerliste (z.B. "Damen 30") — nur manuell im Editor
+    # gesetzt, nie vom Solver.
+    label: str | None = None
+    # Kurzbeschreibung neben dem Trainer (z.B. "U15") — ergänzt die
+    # Spielerliste, ersetzt sie nicht.
+    note: str | None = None
+    # Weitere Trainer derselben Einheit (z.B. zwei Trainer bei einer großen
+    # Zwerge-Gruppe). Nur manuell, der Solver lässt das leer.
+    extra_coach_ids: list[UUID] = Field(default_factory=list)
+    # Kurznotiz hinter einzelnen Spielernamen (z.B. "gerade Wochen"),
+    # je Spieler und nur für diese Einheit.
+    player_notes: dict[UUID, str] = Field(default_factory=dict)
 
 
 class TrainingSessionIn(BaseModel):
@@ -208,6 +276,10 @@ class TrainingSessionIn(BaseModel):
     player_ids: list[UUID] = Field(default_factory=list)
     slot_indices: list[int] = Field(min_length=1)
     session_type: SessionType | None = None
+    label: str | None = Field(None, max_length=100)
+    note: str | None = Field(None, max_length=60)
+    extra_coach_ids: list[UUID] = Field(default_factory=list)
+    player_notes: dict[UUID, str] = Field(default_factory=dict)
 
     @field_validator("slot_indices")
     @classmethod
@@ -232,12 +304,19 @@ class PlanOut(BaseModel):
     score: float
     explanation: str
     sessions: list[TrainingSessionOut]
+    published: bool = False
+    created_at: datetime | None = None
 
 
 class GeneratePlanIn(BaseModel):
     season_id: UUID
     num_solutions: int = Field(3, ge=1, le=10)
-    time_limit_seconds: float = Field(30.0, ge=1.0, le=300.0)
+    # War 30s: bei der echten Datenmenge des Vereins reichte das oft nicht,
+    # um über FEASIBLE hinaus eine bewiesen gute Lösung zu finden — Trainer
+    # blieben ungenutzt und Wunschmitspieler wurden verworfen, obwohl es
+    # zeitlich gepasst hätte. Plan-Generierung läuft asynchron im Worker,
+    # eine längere Wartezeit kostet also keine blockierte UI.
+    time_limit_seconds: float = Field(300.0, ge=1.0, le=1800.0)
     # "both" (Default) = alle Plätze. "indoor" = nur Hallenplätze.
     # "outdoor" = nur Außenplätze. So kann der Coach z.B. für den
     # Winterplan die Outdoor-Plätze ausblenden.
@@ -255,6 +334,16 @@ class PlanDiffOut(BaseModel):
     unchanged_count: int
     workload: WorkloadDeltaOut
     score_delta: float
+
+
+# ---------- Account creation for existing domain records ----------
+
+
+class CreateAccountIn(BaseModel):
+    """Create a login account for an existing player or coach record."""
+
+    email: EmailStr
+    password: str = Field(min_length=12, max_length=128)
 
 
 # ---------- Agent / Chat ----------

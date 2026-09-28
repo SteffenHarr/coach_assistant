@@ -29,41 +29,68 @@ class RelaxationConfig:
     aufgenommen. Die restlichen Flags entfernen die jeweiligen harten
     Constraints komplett (der Solver bestraft sie nur noch implizit über
     das Demand-Reward).
+
+    ``relax_category`` lockert nur die *allgemeine* Kategorie-Trennung
+    (z.B. U12 mit U15, Förderkader mit Mannschaft). Die Ballschule/U8-
+    Trennung ("Zwerge") ist davon bewusst **nicht** betroffen — die bleibt
+    immer hart, kein Tier darf sie aufweichen (siehe
+    ``coach_api.solver.model``: die Ballschule/U8-Regel wird komplett
+    unabhängig von ``rcfg`` erzwungen). Kleinkinder landen also nie als
+    "letzter Ausweg" in einer Gruppe mit viel älteren Kindern.
     """
 
+    relax_one_court_per_day: bool = False
     relax_player_min: bool = False
     relax_coach_block: bool = False
-    relax_coach_max: bool = False
     relax_category: bool = False
+    relax_coach_max: bool = False
 
     def label(self) -> str:
         """Human-readable description of which constraints were dropped."""
         parts: list[str] = []
+        if self.relax_one_court_per_day:
+            parts.append("Ein Platz pro Trainer und Tag (Platzwechsel erlaubt)")
         if self.relax_player_min:
             parts.append("Mindeststunden pro Spieler")
         if self.relax_coach_block:
             parts.append("Mindest-Blocklänge der Trainer")
+        if self.relax_category:
+            parts.append("Trainings-Kategorie-Filter (außer Ballschule/U8, die bleibt immer getrennt)")
         if self.relax_coach_max:
             parts.append("Max. Stunden pro Tag/Woche der Trainer")
-        if self.relax_category:
-            parts.append("Trainings-Kategorie-Filter (Kinder/Jugend/Erwachsene/Mannschaft)")
         return ", ".join(parts) if parts else "keine"
 
 
 # Reihenfolge: zuerst nichts lockern, dann von "kleinster Schmerz" zu
-# "größtmögliche Flexibilität".
+# "größtmögliche Flexibilität". Trainer-Überlastung (relax_coach_max) kommt
+# bewusst NACH der allgemeinen Kategorie-Lockerung — ein Trainer über sein
+# eingestelltes Stunden-Limit zu planen ist ein echtes Arbeitsbelastungs-
+# Thema und wiegt schwerer als z.B. U12 und U15 kurzzeitig zusammenzulegen.
+# Die Ballschule/U8-Trennung ist in KEINER Stufe enthalten — die wird immer
+# hart erzwungen (siehe RelaxationConfig-Docstring).
 FALLBACK_TIERS: tuple[RelaxationConfig, ...] = (
     RelaxationConfig(),
-    RelaxationConfig(relax_player_min=True),
-    RelaxationConfig(relax_player_min=True, relax_coach_block=True),
+    # Zuerst nur das Platz-Constraint lockern: ein Trainer, der an einem Tag
+    # ausnahmsweise den Platz wechseln muss, ist der mit Abstand harmloseste
+    # Kompromiss — spürbar harmloser, als jemandem Trainingsstunden zu
+    # streichen oder Kategorien zu vermischen.
+    RelaxationConfig(relax_one_court_per_day=True),
+    RelaxationConfig(relax_one_court_per_day=True, relax_player_min=True),
     RelaxationConfig(
-        relax_player_min=True, relax_coach_block=True, relax_coach_max=True
+        relax_one_court_per_day=True, relax_player_min=True, relax_coach_block=True
     ),
     RelaxationConfig(
+        relax_one_court_per_day=True,
         relax_player_min=True,
         relax_coach_block=True,
-        relax_coach_max=True,
         relax_category=True,
+    ),
+    RelaxationConfig(
+        relax_one_court_per_day=True,
+        relax_player_min=True,
+        relax_coach_block=True,
+        relax_category=True,
+        relax_coach_max=True,
     ),
 )
 

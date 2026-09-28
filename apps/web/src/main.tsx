@@ -16,27 +16,52 @@ import { CourtsAdminPage } from "./features/court/CourtsAdminPage";
 import { CoachProfilePage } from "./features/coach/CoachProfilePage";
 import { PlayerListPage } from "./features/player/PlayerListPage";
 import { PlayerProfilePage } from "./features/player/PlayerProfilePage";
+import { PlayerEditorPage } from "./features/player/PlayerEditorPage";
 import { ReplanWizard } from "./features/replan/ReplanWizard";
-import { LoginPage } from "./features/auth/LoginPage";
 import { UsersAdminPage } from "./features/admin/UsersAdminPage";
+import { AccountSettingsPage } from "./features/account/AccountSettingsPage";
+import { ImpressumPage } from "./features/legal/ImpressumPage";
+import { DatenschutzPage } from "./features/legal/DatenschutzPage";
+import { LegalFooterLinks } from "./features/legal/LegalFooterLinks";
+import { PrivacyConsentGate } from "./features/legal/PrivacyConsentGate";
 import { PlansLayout, CoachLayout, PlayerLayout } from "./features/nav/Layouts";
+import { HomePage } from "./features/home/HomePage";
+import { NavMenuButton, NavMenuPanel } from "./features/nav/NavMenu";
 import { isLoggedIn, logout, api } from "./api/client";
+import { confirmNavigation } from "./lib/unsavedChanges";
 import "./index.css";
 
 const qc = new QueryClient({
   defaultOptions: {
     queries: {
-      // Don't retry auth errors (401/403) — keeps the "please log in"
-      // message instant instead of waiting 10+ s for 3 retry attempts.
       retry: (failureCount, error) => {
         const status = (error as { status?: number })?.status;
         if (status === 401 || status === 403) return false;
         return failureCount < 2;
       },
-      // Short retry delay; default exponential backoff was up to ~30 s.
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
     },
   },
+});
+
+// Der QueryClient-Cache ist global im Tab, nicht pro Konto getrennt —
+// Queries wie ["me"] werden von mehreren Seiten geteilt (siehe
+// PrivacyConsentGate, UsersAdminPage, CoachListPage, ...). Meldet sich
+// jemand im selben Tab ab und mit einem anderen Konto wieder an, würden
+// diese Seiten sonst kurzzeitig noch die gecachten Daten des vorigen
+// Kontos zeigen (z.B. "Datenschutz schon akzeptiert", weil das noch vom
+// vorherigen Admin-Login im Cache stand), bis ein Hintergrund-Refetch das
+// irgendwann korrigiert. Deshalb: kompletten Cache leeren, sobald sich der
+// Access-Token tatsächlich ändert (Login/Logout/Kontowechsel) — aber nicht
+// bei jedem der periodischen "storage"-Events, die App-weit nur zum
+// Auffrischen der Rolle dienen und den Token gar nicht ändern.
+let lastAccessToken = sessionStorage.getItem("access_token");
+window.addEventListener("storage", () => {
+  const current = sessionStorage.getItem("access_token");
+  if (current !== lastAccessToken) {
+    lastAccessToken = current;
+    qc.clear();
+  }
 });
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -44,11 +69,6 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 function AuthNavLink() {
   const [authed, setAuthed] = useState<boolean>(isLoggedIn);
-  // Seed from sessionStorage so the role-gated nav links stay visible
-  // immediately after a page reload, before /me has answered.
-  const [role, setRole] = useState<string | null>(
-    () => sessionStorage.getItem("user_role"),
-  );
   const nav = useNavigate();
 
   useEffect(() => {
@@ -56,30 +76,41 @@ function AuthNavLink() {
       const ok = isLoggedIn();
       setAuthed(ok);
       if (ok) {
-        api<{ role: string }>("/me")
+        // Der Token zum Zeitpunkt der Anfrage — falls sich zwischenzeitlich
+        // jemand ab- und mit einem anderen Konto wieder angemeldet hat, bis
+        // diese Antwort zurückkommt, gehört die Antwort zum alten Konto und
+        // darf die (schon aktuelle) Rolle nicht mehr überschreiben.
+        const tokenAtRequest = sessionStorage.getItem("access_token");
+        api<{ role: string; privacy_accepted_at: string | null }>("/me")
           .then((u) => {
-            setRole(u.role);
-            sessionStorage.setItem("user_role", u.role);
-            // storage events fire only in *other* tabs - in this tab
-            // wir m\u00fcssen den Listener (z.B. AdminOnlyLink) selbst anstupsen,
-            // sonst erscheint der Admin-Reiter erst nach dem n\u00e4chsten Poll.
-            window.dispatchEvent(new Event("storage"));
+            if (sessionStorage.getItem("access_token") !== tokenAtRequest) return;
+            // Datenschutz-Flag bei jedem Refresh aktuell halten (z.B. falls
+            // auf einem anderen Gerät/Tab akzeptiert wurde) — im
+            // Unterschied zur Rolle unten kostet das kein zusätzliches
+            // Dispatch/keinen Loop, weil PrivacyConsentGate selbst nicht
+            // erneut auf "storage" reagiert, um wiederum diesen Refresh
+            // auszulösen.
+            sessionStorage.setItem("privacy_accepted", u.privacy_accepted_at ? "1" : "0");
+            // Nur dispatchen, wenn sich die Rolle wirklich geändert hat.
+            // refresh() lauscht selbst auf "storage" (siehe unten) — ein
+            // bedingungsloses Dispatch hier hätte sich sonst bei jedem
+            // erfolgreichen Fetch selbst erneut ausgelöst: Endlos-Loop, der
+            // /me ohne Pause abfragt, bis der Browser am
+            // Verbindungslimit hängt.
+            if (sessionStorage.getItem("user_role") !== u.role) {
+              sessionStorage.setItem("user_role", u.role);
+              window.dispatchEvent(new Event("storage"));
+            }
           })
           .catch((err) => {
-            // 401/403 → token is invalid. `api()` has already wiped
-            // sessionStorage; reflect that locally so the button flips
-            // from "Abmelden" to "Anmelden" without waiting for the
-            // next 15s poll.
             const status = (err as { status?: number })?.status;
             if (status === 401 || status === 403) {
               setAuthed(false);
-              setRole(null);
+              sessionStorage.removeItem("user_role");
+              sessionStorage.removeItem("privacy_accepted");
             }
-            // Other network errors: keep the cached role to avoid
-            // dropping nav items on a transient blip.
           });
       } else {
-        setRole(null);
         sessionStorage.removeItem("user_role");
       }
     };
@@ -96,45 +127,23 @@ function AuthNavLink() {
 
   if (authed) {
     return (
-      <>
-        {(role === "coach" || role === "admin") && (
-          <NavLink to="/trainer" className={navLinkClass}>
-            Trainer
-          </NavLink>
-        )}
-        <NavLink to="/spieler" className={navLinkClass}>
-          Spieler
-        </NavLink>
-        {role === "admin" && (
-          <NavLink to="/admin/users" className={navLinkClass}>
-            Benutzer
-          </NavLink>
-        )}
-        <button
-          className="app-nav__link"
-          style={{ background: "transparent", border: "none", cursor: "pointer" }}
-          onClick={() => {
-            logout();
-            nav("/login");
-          }}
-        >
-          Abmelden
-        </button>
-      </>
+      <button
+        className="app-nav__link"
+        onClick={() => { if (!confirmNavigation()) return; logout(); nav("/"); }}
+      >
+        Abmelden
+      </button>
     );
   }
   return (
-    <NavLink to="/login" className={navLinkClass}>
+    <NavLink to="/" className={navLinkClass}>
       Anmelden
     </NavLink>
   );
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  // Globaler Gate vor allen geschützten Routen. Reagiert sofort auf
-  // Login/Logout/Token-Ablauf (sessionStorage + storage events).
   const [authed, setAuthed] = useState<boolean>(isLoggedIn);
-  const loc = useLocation();
   useEffect(() => {
     const sync = () => setAuthed(isLoggedIn());
     window.addEventListener("storage", sync);
@@ -145,14 +154,20 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
     };
   }, []);
   if (!authed) {
-    return <Navigate to="/login" replace state={{ from: loc.pathname }} />;
+    return <Navigate to="/" replace />;
   }
   return <>{children}</>;
 }
 
+function PlayerIndexRoute() {
+  // Plain players only ever see themselves in the roster — send them
+  // straight to their own profile instead of a redundant one-row list.
+  const role = sessionStorage.getItem("user_role");
+  const isStaff = role === "admin" || role === "planner" || role === "coach";
+  return isStaff ? <PlayerListPage /> : <Navigate to="/spieler/profil" replace />;
+}
+
 function AuthedOnly({ children }: { children: React.ReactNode }) {
-  // Wie RequireAuth, aber rendert einfach nichts statt zu navigieren -
-  // für Nav-Links, die ohne Login unsichtbar sein sollen.
   const [authed, setAuthed] = useState<boolean>(isLoggedIn);
   useEffect(() => {
     const sync = () => setAuthed(isLoggedIn());
@@ -167,30 +182,87 @@ function AuthedOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function AdminOnlyLink({ to, label }: { to: string; label: string }) {
-  // Reaktiv auf Storage-Events (Login/Logout, Token-Ablauf) und auf das
-  // 15s-Polling von AuthNavLink reagieren, damit der Reiter nicht "manchmal
-  // da, manchmal weg" wirkt. Vorher wurde sessionStorage nur einmalig beim
-  // Render gelesen.
-  const [role, setRole] = useState<string | null>(() =>
-    sessionStorage.getItem("user_role"),
-  );
-  useEffect(() => {
-    const sync = () => setRole(sessionStorage.getItem("user_role"));
-    window.addEventListener("storage", sync);
-    window.addEventListener("focus", sync);
-    const id = window.setInterval(sync, 5000);
-    return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("focus", sync);
-      window.clearInterval(id);
-    };
-  }, []);
-  if (role !== "admin") return null;
+function AppFooter() {
   return (
-    <NavLink to={to} className={navLinkClass}>
-      {label}
-    </NavLink>
+    <footer style={{ padding: "var(--space-4) var(--space-5)", display: "flex", justifyContent: "center" }}>
+      <LegalFooterLinks />
+    </footer>
+  );
+}
+
+function AppShell() {
+  const location = useLocation();
+  const isHome = location.pathname === "/";
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Close the panel automatically when navigating away (e.g. via a tile).
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  return (
+    <div className="app-shell">
+      <PrivacyConsentGate />
+      <div className={`app-content${menuOpen ? " app-content--blurred" : ""}`}>
+        {!isHome && (
+          <nav className="app-nav">
+            <Link
+              to="/"
+              className="app-nav__brand"
+              onClick={(e) => { if (!confirmNavigation()) e.preventDefault(); }}
+            >
+              <span className="app-nav__brand-dot" aria-hidden />
+              Coach Assistant
+            </Link>
+            <AuthedOnly>
+              <NavMenuButton open={menuOpen} setOpen={setMenuOpen} />
+            </AuthedOnly>
+            <span className="app-nav__spacer" />
+            <AuthedOnly>
+              <NavLink
+                to="/konto"
+                className={navLinkClass}
+                title="Mein Konto"
+                onClick={(e) => { if (!confirmNavigation()) e.preventDefault(); }}
+              >
+                Mein Konto
+              </NavLink>
+            </AuthedOnly>
+            <AuthNavLink />
+          </nav>
+        )}
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/plaene" element={<RequireAuth><App><PlansLayout /></App></RequireAuth>}>
+          <Route index element={<PlansPage />} />
+          <Route path="vergleich" element={<PlanDiffView />} />
+          <Route path="saisonwechsel" element={<ReplanWizard />} />
+        </Route>
+        <Route path="/plans/:planId" element={<RequireAuth><App><PlanDetailPage /></App></RequireAuth>} />
+        <Route path="/verfuegbarkeiten" element={<RequireAuth><App><AvailabilityPage /></App></RequireAuth>} />
+        <Route path="/plaetze" element={<RequireAuth><App><CourtsAdminPage /></App></RequireAuth>} />
+        <Route path="/trainer" element={<RequireAuth><App><CoachLayout /></App></RequireAuth>}>
+          <Route index element={<CoachListPage />} />
+          <Route path="profil" element={<CoachProfilePage />} />
+          <Route path="bulk" element={<CoachEditorPage />} />
+        </Route>
+        <Route path="/spieler" element={<RequireAuth><App><PlayerLayout /></App></RequireAuth>}>
+          <Route index element={<PlayerIndexRoute />} />
+          <Route path="profil" element={<PlayerProfilePage />} />
+          <Route path="daten" element={<PlayerEditorPage />} />
+        </Route>
+        <Route path="/chat" element={<RequireAuth><App><ChatPanel /></App></RequireAuth>} />
+        <Route path="/admin/users" element={<RequireAuth><App><UsersAdminPage /></App></RequireAuth>} />
+        <Route path="/konto" element={<RequireAuth><App><AccountSettingsPage /></App></RequireAuth>} />
+        <Route path="/impressum" element={<App><ImpressumPage /></App>} />
+        <Route path="/datenschutz" element={<App><DatenschutzPage /></App>} />
+      </Routes>
+        {!isHome && <AppFooter />}
+        {!isHome && <ChatDock />}
+      </div>
+      <NavMenuPanel open={menuOpen} setOpen={setMenuOpen} />
+    </div>
   );
 }
 
@@ -198,47 +270,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={qc}>
       <BrowserRouter>
-        <div className="app-shell">
-          <nav className="app-nav">
-            <Link to="/" className="app-nav__brand">
-              <span className="app-nav__brand-dot" aria-hidden />
-              Coach Assistant
-            </Link>
-            <AuthedOnly>
-              <NavLink to="/plaene" className={navLinkClass}>Pläne</NavLink>
-            </AuthedOnly>
-            <AdminOnlyLink to="/verfuegbarkeiten" label="Verfügbarkeiten" />
-            <AdminOnlyLink to="/plaetze" label="Plätze" />
-            <span className="app-nav__spacer" />
-            <AuthNavLink />
-          </nav>
-          <Routes>
-            <Route path="/login" element={<App><LoginPage /></App>} />
-            <Route path="/" element={<RequireAuth><App><PlansLayout /></App></RequireAuth>}>
-              <Route index element={<PlansPage />} />
-            </Route>
-            <Route path="/plaene" element={<RequireAuth><App><PlansLayout /></App></RequireAuth>}>
-              <Route index element={<PlansPage />} />
-              <Route path="vergleich" element={<PlanDiffView />} />
-              <Route path="saisonwechsel" element={<ReplanWizard />} />
-            </Route>
-            <Route path="/plans/:planId" element={<RequireAuth><App><PlanDetailPage /></App></RequireAuth>} />
-            <Route path="/verfuegbarkeiten" element={<RequireAuth><App><AvailabilityPage /></App></RequireAuth>} />
-            <Route path="/plaetze" element={<RequireAuth><App><CourtsAdminPage /></App></RequireAuth>} />
-            <Route path="/trainer" element={<RequireAuth><App><CoachLayout /></App></RequireAuth>}>
-              <Route index element={<CoachListPage />} />
-              <Route path="profil" element={<CoachProfilePage />} />
-              <Route path="bulk" element={<CoachEditorPage />} />
-            </Route>
-            <Route path="/spieler" element={<RequireAuth><App><PlayerLayout /></App></RequireAuth>}>
-              <Route index element={<PlayerListPage />} />
-              <Route path="profil" element={<PlayerProfilePage />} />
-            </Route>
-            <Route path="/chat" element={<RequireAuth><App><ChatPanel /></App></RequireAuth>} />
-            <Route path="/admin/users" element={<RequireAuth><App><UsersAdminPage /></App></RequireAuth>} />
-          </Routes>
-          <ChatDock />
-        </div>
+        <AppShell />
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>

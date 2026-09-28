@@ -1,6 +1,11 @@
 # ADR 0003: Lokales LLM via Ollama
 
-**Status:** Accepted
+**Status:** Superseded — durch einen deterministischen, regelbasierten
+Chat-Bot ersetzt (`coach_api.infrastructure.bot`). Kein Ollama/LangChain/
+LangGraph mehr im Stack. Gründe: einfachere Betriebsanforderungen (kein
+GPU/RAM-Bedarf), keine Prompt-Injection-Angriffsfläche, deterministische
+und sofortige Antworten. Dieser Eintrag bleibt als historischer Kontext
+erhalten.
 **Date:** 2026-05-11
 
 ## Context

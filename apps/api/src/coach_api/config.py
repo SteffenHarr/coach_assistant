@@ -30,15 +30,6 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://redis:6379/0"
 
-    # LLM
-    ollama_base_url: str = "http://ollama:11434"
-    # 3B model: ~4× faster than 8B on CPU, still good enough for short
-    # German Q&A and the limited tool-calling we do. Override via env
-    # OLLAMA_MODEL to use a bigger / smaller model.
-    ollama_model: str = "llama3.2:3b-instruct-q4_K_M"
-    agent_max_tool_calls: int = 10
-    agent_require_confirmation: bool = True
-
     # Solver
     solver_time_limit_seconds: float = 30.0
     solver_num_solutions: int = 3

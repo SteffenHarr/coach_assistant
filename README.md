@@ -1,8 +1,8 @@
 # Coach Assistant – Tennis-Trainingsplaner
 
 Open-Source-Webanwendung zur automatischen Erstellung wöchentlicher Tennis-Trainingspläne
-mit einem mathematischen Optimierer (OR-Tools CP-SAT) und einem konversationellen
-LLM-Agenten (lokal via Ollama).
+mit einem mathematischen Optimierer (OR-Tools CP-SAT) und einem deterministischen,
+regelbasierten Chat-Assistenten (kein LLM — schnell, ohne GPU-Bedarf, keine Halluzinationen).
 
 ## Features
 
@@ -11,9 +11,9 @@ LLM-Agenten (lokal via Ollama).
 - Trainer-Constraints (z. B. „mindestens 3 Stunden am Stück", max. Stunden pro Tag/Woche).
 - Saisonale Pläne (zwei pro Jahr), versioniert und immutable.
 - Solver liefert mehrere Plan-Varianten mit Score und Begründung.
-- Chat-Agent zum Pflegen von Daten und Erklären/Vergleichen von Plänen.
+- Regelbasierter Chat-Bot zum Pflegen von Daten und Erklären/Vergleichen von Plänen.
 - Export als ICS und PDF.
-- Rollen: Admin, Coach, Player.
+- Rollen: Admin, Planner, Coach, Player.
 
 ## Tech-Stack (alles Open Source)
 
@@ -22,8 +22,7 @@ LLM-Agenten (lokal via Ollama).
 | Frontend | React + TypeScript + Vite + TanStack Query + react-big-calendar | MIT |
 | API | FastAPI + Pydantic v2 | MIT/BSD |
 | Solver | Google OR-Tools (CP-SAT) | Apache-2.0 |
-| Agent | LangGraph + LangChain (mit Ollama-Backend) | MIT |
-| LLM | Ollama (z. B. `llama3.1`, `qwen2.5`) lokal | MIT |
+| Chat-Bot | Regelbasiert, deterministisch (kein LLM) | — |
 | DB | PostgreSQL 16 + SQLAlchemy 2 + Alembic | PostgreSQL/MIT |
 | Queue | Redis + RQ | BSD/MIT |
 | Auth | fastapi-users + Argon2 + JWT | MIT |
@@ -39,13 +38,12 @@ Keine kostenpflichtigen Cloud-Dienste erforderlich. Alles kann komplett selbst g
 
 ```bash
 cp .env.example .env            # Secrets anpassen, KEINE Default-Werte in Produktion!
-docker compose -f deploy/docker-compose.yml up --build
+docker compose --env-file .env -f deploy/docker-compose.yml up --build
 # Web-UI:     https://localhost/
 # OpenAPI:    https://localhost/api/docs
 ```
 
-Beim ersten Start lädt Ollama automatisch das konfigurierte Modell
-(siehe `OLLAMA_MODEL` in `.env.example`).
+> `--env-file .env` muss bei **jedem** `docker compose`-Befehl mit angegeben werden, da die Compose-Datei in `deploy/` liegt, die `.env` aber im Hauptordner.
 
 ## Architektur
 
@@ -71,7 +69,7 @@ Kurzfassung:
 - Kurzlebige JWT-Access-Tokens + httpOnly Refresh-Cookies.
 - Strikte CORS, Rate Limiting (slowapi).
 - Security-Header (HSTS, CSP, X-Frame-Options) via Caddy.
-- LLM läuft lokal — keine personenbezogenen Daten verlassen den Server.
+- Chat-Bot ist regelbasiert und läuft komplett lokal — keine personenbezogenen Daten verlassen den Server, keine externen KI-Dienste.
 - Audit-Log aller schreibenden Aktionen.
 - DSGVO-Endpunkte: Datenexport (Art. 15) und Löschung (Art. 17).
 - Secrets ausschließlich über Umgebungsvariablen.

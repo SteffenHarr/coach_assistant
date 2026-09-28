@@ -32,22 +32,6 @@ services:
       - redis_data:/data
     networks: [internal]
 
-  ollama:
-    image: ollama/ollama:latest
-    restart: unless-stopped
-    volumes:
-      - ollama_data:/root/.ollama
-    networks: [internal]
-    # Pre-pull configured model on first start
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        /bin/ollama serve &
-        pid=$$!
-        sleep 5
-        /bin/ollama pull "${OLLAMA_MODEL}" || true
-        wait $$pid
-
   api:
     build:
       context: ../apps/api
@@ -56,7 +40,6 @@ services:
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_started }
-      ollama: { condition: service_started }
     networks: [internal]
     # Run migrations then start uvicorn
     command:
@@ -78,6 +61,7 @@ services:
   web:
     build:
       context: ../apps/web
+    restart: unless-stopped
     networks: [internal]
     # Serves /srv/web via Caddy (configured by the proxy below)
 
@@ -85,8 +69,13 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      # Bound to loopback only — the Cloudflare Tunnel doesn't need these at
+      # all (it reaches caddy via the internal Docker network by service
+      # name), they only exist for local https://localhost testing. Without
+      # this restriction, anyone on the same LAN/WiFi could reach the app
+      # directly by IP, bypassing Cloudflare's protections entirely.
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
     environment:
       DOMAIN: ${DOMAIN:-localhost}
       TLS_EMAIL: ${TLS_EMAIL:-internal}
@@ -97,6 +86,19 @@ services:
     depends_on: [api, web]
     networks: [internal]
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # Named tunnel bound to a stable hostname (see docs/SETUP.md, Schritt 7,
+    # Variante A). The Public Hostname -> Service mapping is configured in
+    # the Cloudflare dashboard, not here. CLOUDFLARE_TUNNEL_TOKEN is
+    # optional — if unset, this container just idles/restarts without a
+    # token; it does not block the rest of the stack from starting (e.g.
+    # local-only use, or before Schritt 7 has been done yet).
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    networks: [internal]
+    depends_on: [caddy]
+
 networks:
   internal:
     driver: bridge
@@ -104,6 +106,5 @@ networks:
 volumes:
   db_data:
   redis_data:
-  ollama_data:
   caddy_data:
   caddy_config:

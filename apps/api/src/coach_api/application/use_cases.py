@@ -45,13 +45,22 @@ class GeneratePlanUseCase:
         self._seasons = seasons
         self._plans = plans
 
-    async def execute(self, cmd: GeneratePlanCommand) -> list[WeeklyPlan]:
+    async def execute(self, cmd: GeneratePlanCommand, on_progress=None) -> list[WeeklyPlan]:
+        """``on_progress``, if given, is called as ``on_progress(message)``
+        with a short human-readable status string — used by the background
+        job (see ``coach_api.jobs.plan_generation``) to report live
+        progress instead of leaving the caller waiting with no feedback."""
         season = await self._seasons.get(cmd.season_id)
         if season is None:
             raise ValueError(f"Season {cmd.season_id} not found")
 
         coaches = await self._coaches.list_all()
         players = await self._players.list_all()
+        # Pausierte Trainer/Spieler (siehe PATCH /coaches/{id}/active und
+        # PATCH /players/{id}/active) nimmt der Solver nicht mehr auf — ihre
+        # Daten bleiben aber erhalten.
+        coaches = [c for c in coaches if c.active]
+        players = [p for p in players if p.active]
         courts = await self._courts.list_all()
 
         # Indoor/Outdoor-Filter anwenden, bevor der Solver läuft.
@@ -73,7 +82,16 @@ class GeneratePlanUseCase:
         # progressiv lockerer. Sobald wir Pläne haben, brechen wir ab und
         # dokumentieren in der Erklärung, welche Constraints geopfert wurden.
         last_status = "EMPTY_INPUT"
+        num_tiers = len(FALLBACK_TIERS)
         for tier_idx, rcfg in enumerate(FALLBACK_TIERS):
+            if on_progress:
+                tier_note = "strikte Vorgaben" if tier_idx == 0 else f"gelockerte Vorgaben Stufe {tier_idx}"
+                on_progress(f"Versuch {tier_idx + 1}/{num_tiers} ({tier_note}) — Variante 0/{cmd.num_solutions}")
+
+            def _variant_progress(done: int, total: int, tier_idx=tier_idx) -> None:
+                if on_progress:
+                    on_progress(f"Versuch {tier_idx + 1}/{num_tiers} — Variante {done}/{total} fertig")
+
             result = solve(
                 SolverInput(
                     grid=grid,
@@ -86,6 +104,7 @@ class GeneratePlanUseCase:
                 ),
                 season_id=season.id,
                 relax=rcfg,
+                on_progress=_variant_progress,
             )
             last_status = result.status
             if result.plans:

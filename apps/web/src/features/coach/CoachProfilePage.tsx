@@ -53,11 +53,12 @@ export function CoachProfilePage() {
   const [lkMax, setLkMax] = useState<number | null>(null);
   const [ageMin, setAgeMin] = useState<number | null>(null);
   const [ageMax, setAgeMax] = useState<number | null>(null);
+  const [conflict, setConflict] = useState<{ existing_id: string; existing_name: string } | null>(null);
 
   useEffect(() => {
     const c = me.data?.coach;
     if (!c) {
-      // No coach record yet — admin can create one on save.
+      // No coach record yet — gets created on first save.
       setName(me.data?.user.email?.split("@")[0] ?? "");
       setSlots([]);
       setMaxGroup(4);
@@ -88,8 +89,8 @@ export function CoachProfilePage() {
   }, [me.data]);
 
   const save = useMutation({
-    mutationFn: () =>
-      api("/me/profile/coach", {
+    mutationFn: (resolve?: "take_over" | "replace") =>
+      api(`/me/profile/coach${resolve ? `?resolve=${resolve}` : ""}`, {
         method: "PUT",
         body: JSON.stringify({
           name,
@@ -108,7 +109,17 @@ export function CoachProfilePage() {
           },
         }),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["me-profile"] }),
+    onSuccess: () => {
+      setConflict(null);
+      qc.invalidateQueries({ queryKey: ["me-profile"] });
+    },
+    onError: (e: any) => {
+      if (e?.status === 409 && e?.body?.detail?.existing_id) {
+        setConflict(e.body.detail);
+      } else {
+        setConflict(null);
+      }
+    },
   });
 
   if (!authed) return <LoginRequired />;
@@ -120,20 +131,6 @@ export function CoachProfilePage() {
         <p className="muted">Nur Trainer und Admins können hier Daten pflegen.</p>
       </section>
     );
-  // Coach role users without a record: blocked. Admins can self-provision by
-  // simply filling and saving the form.
-  if (me.data?.coach == null && me.data?.user.role === "coach")
-    return (
-      <section>
-        <h2>Mein Trainer-Profil</h2>
-        <p className="muted">
-          Für deinen Account ist noch kein Trainer-Datensatz angelegt. Bitte
-          einen Admin, dich als Trainer zu hinterlegen
-          (Benutzer-Verwaltung → Rolle „Trainer").
-        </p>
-      </section>
-    );
-
   return (
     <section className="stack">
       <h2>Mein Trainer-Profil</h2>
@@ -289,12 +286,40 @@ export function CoachProfilePage() {
         <AvailabilityGrid value={slots} onChange={setSlots} />
       </div>
 
+      {conflict && (
+        <div className="card" style={{ borderColor: "var(--color-danger)" }}>
+          <p style={{ marginTop: 0 }}>
+            Es gibt bereits einen noch nicht mit einem Konto verknüpften Trainer-Datensatz
+            namens <strong>„{conflict.existing_name}"</strong>. Bist du das?
+          </p>
+          <div className="row">
+            <button onClick={() => save.mutate("take_over")} disabled={save.isPending}>
+              Ja, das bin ich — übernehmen
+            </button>
+            <button
+              className="btn--danger"
+              disabled={save.isPending}
+              onClick={() => {
+                if (window.confirm(`„${conflict.existing_name}" wirklich löschen und einen neuen Datensatz für dich anlegen?`)) {
+                  save.mutate("replace");
+                }
+              }}
+            >
+              Nein — alten löschen, neu anlegen
+            </button>
+            <button className="btn--ghost" disabled={save.isPending} onClick={() => setConflict(null)}>
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="row">
-        <button onClick={() => save.mutate()} disabled={save.isPending}>
+        <button onClick={() => save.mutate(undefined)} disabled={save.isPending}>
           {save.isPending ? "Speichert…" : "Profil speichern"}
         </button>
         {save.isSuccess && <span className="muted">Gespeichert ✓</span>}
-        {save.isError && (
+        {save.isError && !conflict && (
           <span style={{ color: "var(--color-danger)" }}>
             {(save.error as Error).message}
           </span>

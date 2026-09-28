@@ -37,8 +37,9 @@ Siehe [SECURITY.md](SECURITY.md). Insbesondere:
 
 ## Auftragsverarbeitung (Art. 28)
 
-- Es findet **keine** Übermittlung an Dritte statt — das LLM läuft lokal (Ollama).
+- Es findet **keine** Übermittlung an Dritte statt — der Chat-Bot ist regelbasiert und läuft komplett lokal, es wird kein externer KI-Dienst angesprochen.
 - Beim Self-Hosting ist der Betreiber Verantwortlicher; bei externem Hosting ist ein AVV mit dem Hoster abzuschließen.
+- **Cloudflare Tunnel** (siehe [SETUP.md](SETUP.md), Schritt 7): Wenn die App über einen Cloudflare Tunnel erreichbar gemacht wird, läuft der gesamte Traffic (verschlüsselt) über Cloudflares Netzwerk — Cloudflare wird damit technisch zum Auftragsverarbeiter. Cloudflare bietet dafür ein Standard-AVV an (in den Nutzungsbedingungen enthalten); Betreiber sollten das im eigenen Verzeichnis von Verarbeitungstätigkeiten dokumentieren.
 
 ## Hinweise an Nutzer
 

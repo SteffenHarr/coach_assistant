@@ -30,3 +30,6 @@ Thumbs.db
 
 # Docker volumes (when bound locally)
 deploy/data/
+
+# Database backups (contain real personal data — never committed)
+backups/

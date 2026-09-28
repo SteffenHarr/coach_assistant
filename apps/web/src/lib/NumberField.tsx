@@ -70,7 +70,7 @@ export function NumberField({
       type="number"
       inputMode="decimal"
       value={text}
-      onChange={(e) => setText(e.target.value)}
+      onChange={(e) => setText(e.target.value.replace(/^0+(?=\d)/, ""))}
       onBlur={(e) => commit(e.target.value)}
       onKeyDown={(e) => {
         if (e.key === "Enter") (e.target as HTMLInputElement).blur();

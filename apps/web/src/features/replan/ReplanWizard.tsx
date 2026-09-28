@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { api, isLoggedIn } from "../../api/client";
@@ -37,23 +37,47 @@ export function ReplanWizard() {
     },
   });
 
-  // Step 3: generate plan
+  // Step 3: generate plan — runs as a background job (see PlansPage.tsx for
+  // the full rationale) instead of one long blocking request, so there's no
+  // HTTP timeout risk regardless of how many variants are requested.
   const [numVariants, setNumVariants] = useState(3);
   const [courtFilter, setCourtFilter] = useState<"both" | "indoor" | "outdoor">("both");
-  const [generated, setGenerated] = useState<Plan[] | null>(null);
-  const generate = useMutation({
+  const [generated, setGenerated] = useState<{ id: string; score: number; sessions: number }[] | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+
+  const startGenerate = useMutation({
     mutationFn: () =>
-      api<Plan[]>("/plans/generate", {
+      api<{ job_id: string }>("/plans/generate-async", {
         method: "POST",
         body: JSON.stringify({
           season_id: newSeasonId,
           num_solutions: numVariants,
-          time_limit_seconds: 30,
+          time_limit_seconds: 300,
           court_filter: courtFilter,
         }),
       }),
-    onSuccess: (plans) => setGenerated(plans),
+    onSuccess: (res) => { setGenerated(null); setJobId(res.job_id); },
   });
+
+  type JobStatus = { status: string; status_text?: string | null; error?: string; plans?: { id: string; score: number; sessions: number }[] };
+  const jobStatus = useQuery({
+    queryKey: ["job", jobId],
+    queryFn: () => api<JobStatus>(`/jobs/${jobId}`),
+    enabled: !!jobId,
+    refetchInterval: (query) => {
+      const s = query.state.data?.status;
+      return s === "finished" || s === "failed" ? false : 1500;
+    },
+  });
+
+  useEffect(() => {
+    if (jobId && jobStatus.data?.status === "finished") {
+      setGenerated(jobStatus.data.plans ?? []);
+      setJobId(null);
+    }
+  }, [jobId, jobStatus.data]);
+
+  const generating = !!jobId && jobStatus.data?.status !== "finished" && jobStatus.data?.status !== "failed";
 
   // Baseline plan from previous season
   const baseline = useQuery({
@@ -84,11 +108,20 @@ export function ReplanWizard() {
 
       {step === 1 && (
         <Card title="2. Neue Saison anlegen">
-          <div style={{ display: "grid", gap: 8, maxWidth: 380 }}>
-            <input placeholder="Name (z. B. Sommer 2026)" value={name} onChange={(e) => setName(e.target.value)} />
-            <label>Gültig von <input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} /></label>
-            <label>Gültig bis <input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} /></label>
-            {createSeason.error && <p style={{ color: "crimson" }}>Anlegen fehlgeschlagen.</p>}
+          <div style={{ display: "grid", gap: "var(--space-3)", maxWidth: 380 }}>
+            <label>
+              Name
+              <input placeholder="z. B. Sommer 2026" value={name} onChange={(e) => setName(e.target.value)} />
+            </label>
+            <label>
+              Gültig von
+              <input type="date" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
+            </label>
+            <label>
+              Gültig bis
+              <input type="date" value={validTo} onChange={(e) => setValidTo(e.target.value)} />
+            </label>
+            {createSeason.error && <p style={{ color: "var(--color-danger)" }}>Anlegen fehlgeschlagen.</p>}
           </div>
           <Nav
             onPrev={() => setStep(0)}
@@ -115,39 +148,52 @@ export function ReplanWizard() {
 
       {step === 3 && (
         <Card title="4. Pläne generieren">
-          <label>
-            Anzahl Varianten:&nbsp;
-            <input
-              type="number"
-              min={1}
-              max={10}
-              value={numVariants}
-              onChange={(e) => setNumVariants(Number(e.target.value) || 1)}
-            />
-          </label>
-          <label style={{ marginLeft: 16 }}>
-            Plätze:&nbsp;
-            <select
-              value={courtFilter}
-              onChange={(e) =>
-                setCourtFilter(e.target.value as "both" | "indoor" | "outdoor")
-              }
+          <div className="row" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
+            <label>
+              Anzahl Varianten
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={numVariants}
+                onChange={(e) => setNumVariants(Number(e.target.value) || 1)}
+              />
+            </label>
+            <label>
+              Plätze
+              <select
+                value={courtFilter}
+                onChange={(e) =>
+                  setCourtFilter(e.target.value as "both" | "indoor" | "outdoor")
+                }
+              >
+                <option value="both">alle (Indoor + Outdoor)</option>
+                <option value="indoor">nur Halle (Indoor)</option>
+                <option value="outdoor">nur draußen (Outdoor)</option>
+              </select>
+            </label>
+            <button
+              onClick={() => startGenerate.mutate()}
+              disabled={generating || startGenerate.isPending}
             >
-              <option value="both">alle (Indoor + Outdoor)</option>
-              <option value="indoor">nur Halle (Indoor)</option>
-              <option value="outdoor">nur draußen (Outdoor)</option>
-            </select>
-          </label>
-          <button
-            onClick={() => generate.mutate()}
-            disabled={generate.isPending}
-            style={{ marginLeft: 12, padding: "8px 16px" }}
-          >
-            {generate.isPending ? "rechne..." : "Pläne generieren"}
-          </button>
-          {generate.error && (
-            <p style={{ color: "crimson" }}>
-              Fehler: {(generate.error as Error).message}
+              {generating ? "rechne…" : "Pläne generieren"}
+            </button>
+          </div>
+
+          {generating && (
+            <div style={{ marginTop: "var(--space-3)", maxWidth: 380 }}>
+              <div style={{ height: 6, borderRadius: "var(--radius-pill)", background: "var(--color-surface-muted)", overflow: "hidden" }}>
+                <div className="progress-indeterminate" />
+              </div>
+              <p className="muted" style={{ fontSize: "var(--text-xs)", margin: "6px 0 0" }}>
+                {jobStatus.data?.status_text ?? "Berechnung läuft…"}
+              </p>
+            </div>
+          )}
+
+          {(startGenerate.error || jobStatus.data?.status === "failed") && (
+            <p style={{ color: "var(--color-danger)" }}>
+              Fehler: {startGenerate.error ? (startGenerate.error as Error).message : jobStatus.data?.error}
             </p>
           )}
 
@@ -155,10 +201,10 @@ export function ReplanWizard() {
             <>
               <h3 style={{ marginTop: 16 }}>Ergebnis</h3>
               <ul>
-                {generated.map((p) => (
+                {[...generated].sort((a, b) => b.score - a.score).map((p, i) => (
                   <li key={p.id}>
                     <Link to={`/plans/${p.id}`}>
-                      Plan {p.id.slice(0, 8)} – Score {p.score.toFixed(1)} – {p.sessions.length} Sessions
+                      Variante {i + 1} – Score {p.score.toFixed(1)} – {p.sessions} Sessions
                     </Link>
                     {baseline.data && (
                       <>
@@ -190,11 +236,13 @@ function Stepper({ step }: { step: Step }) {
     <ol style={{ display: "flex", gap: 16, padding: 0, listStyle: "none", marginBottom: 16 }}>
       {labels.map((l, i) => (
         <li key={l} style={{
-          padding: "4px 10px",
-          borderRadius: 4,
-          background: i === step ? "#2e7d32" : i < step ? "#a5d6a7" : "#eee",
-          color: i === step ? "#fff" : "#333",
-          fontSize: 13,
+          padding: "4px 12px",
+          borderRadius: "var(--radius-pill)",
+          background: i === step ? "var(--color-primary)" : i < step ? "var(--color-primary-soft)" : "var(--color-surface-muted)",
+          color: i === step ? "var(--color-primary-fg)" : i < step ? "var(--color-primary)" : "var(--color-text-muted)",
+          fontSize: "var(--text-sm)",
+          fontWeight: i === step ? 600 : 400,
+          border: i === step ? "none" : "1px solid var(--color-border)",
         }}>
           {i + 1}. {l}
         </li>
@@ -205,8 +253,8 @@ function Stepper({ step }: { step: Step }) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 16, marginBottom: 12 }}>
-      <h3 style={{ marginTop: 0 }}>{title}</h3>
+    <div className="card">
+      <h3 className="card__title">{title}</h3>
       {children}
     </div>
   );

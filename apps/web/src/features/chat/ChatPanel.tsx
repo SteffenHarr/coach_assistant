@@ -30,8 +30,8 @@ export function ChatPanel() {
   return (
     <section>
       <h2>Chat-Agent</h2>
-      <p style={{ color: "#666" }}>
-        Lokales LLM via Ollama. Schreibende Aktionen erfordern explizite Bestätigung.
+      <p className="muted">
+        Regelbasierter Assistent — beantwortet Fragen rund um das Programm.
       </p>
       <div style={{ border: "1px solid #ccc", borderRadius: 8, padding: 12, minHeight: 240 }}>
         {history.map((m, i) => (

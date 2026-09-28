@@ -7,7 +7,7 @@
 | Spoofing (Identitätsdiebstahl) | Argon2id für Passwörter, JWT mit kurzer Laufzeit, Rate Limiting auf Login |
 | Tampering (Daten-Manipulation) | Server-seitige Pydantic-Validierung, Audit-Log aller Writes, RBAC |
 | Repudiation (Bestreitbarkeit) | Audit-Log mit Actor-, Action-, Target-ID, Timestamp |
-| Information Disclosure | TLS überall, restriktive CORS, Security-Header, lokales LLM (keine Daten verlassen den Server) |
+| Information Disclosure | TLS überall, restriktive CORS, Security-Header, regelbasierter Chat-Bot ohne externe KI-Dienste (keine Daten verlassen den Server) |
 | Denial of Service | Rate Limiting (slowapi), Timeout im Solver, Request-Body-Limit (Caddy 1 MB) |
 | Elevation of Privilege | Rollen-basierte Dependencies (`require_role`), Superuser nur via DB-Migration setzbar |
 
@@ -15,7 +15,7 @@
 
 - **Passwort-Hashing:** Argon2id (`argon2-cffi` mit sicheren Defaults). Automatisches Re-Hash bei geänderten Parametern.
 - **Tokens:** JWT (HS256), Access-Token TTL 15 min. Refresh-Tokens optional als httpOnly+Secure+SameSite=Strict Cookie. Web-Frontend speichert Access-Token in `sessionStorage` (verschwindet beim Tab-Schließen).
-- **Rollen:** `admin`, `coach`, `player`. Endpoints erzwingen Mindestrolle via FastAPI-Dependency `require_role`.
+- **Rollen:** `admin`, `planner`, `coach`, `player`. Endpoints erzwingen Mindestrolle via FastAPI-Dependency `require_role`. Ein Account kann zusätzlich als „geschützt" (`is_protected`) markiert werden — nur der Inhaber selbst kann diesen Account dann noch ändern oder löschen, auch andere Admins nicht (nur direkt per DB-Zugriff setzbar, siehe SETUP.md).
 - **Mindestpasswortlänge:** 12 Zeichen (Pydantic-Validator).
 
 ## Transport & Header
@@ -36,17 +36,15 @@
 - Caddy: max. Request-Body 1 MB.
 - Solver: harter Zeitlimit in Sekunden (Default 30) — verhindert Endlos-Berechnungen.
 
-## LLM-Sicherheit
+## Chat-Bot-Sicherheit
 
-- **Lokales Modell** (Ollama). Es wird kein API-Key benötigt und keine Daten verlassen den Server.
-- **Tool-Calls:** Schreibende Tools des Agents werden nur ausgeführt, wenn der Nutzer explizit bestätigt (`AGENT_REQUIRE_CONFIRMATION=true`).
-- **Prompt-Injection:** System-Prompt enthält klare Regeln; Tool-Outputs werden vom Agent als Daten behandelt, nicht als Anweisungen. Audit-Log aller Tool-Calls.
-- **Begrenzung:** `AGENT_MAX_TOOL_CALLS=10` pro Konversation.
+- **Kein LLM.** Der Chat-Bot ist deterministisch und regelbasiert (Keyword-Matching + Live-Datenbankabfragen). Kein externer API-Call, kein API-Key, keine Daten verlassen den Server.
+- Da keine Sprachmodell-Ausgabe generiert wird, entfällt die klassische Prompt-Injection-Angriffsfläche (der Bot kann nicht durch geschickt formulierte Nutzereingaben zu unbeabsichtigten Aktionen verleitet werden).
 
 ## Container & Deployment
 
 - Container laufen als Non-Root-User (UID ≥ 10000).
-- DB, Redis, Ollama haben **keine** Host-Port-Bindings — nur das interne Docker-Netz.
+- DB und Redis haben **keine** Host-Port-Bindings — nur das interne Docker-Netz.
 - Healthchecks für DB und API.
 - Secrets ausschließlich über Umgebungsvariablen (`.env` nicht committen, nutzt z. B. Docker Secrets oder Vault in Produktion).
 

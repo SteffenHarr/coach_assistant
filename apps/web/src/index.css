@@ -23,6 +23,18 @@
   --color-danger: #dc2626;
   --color-warning: #d97706;
 
+  --color-avail: #2d5a47;
+  --color-avail-hover: rgba(45, 90, 71, 0.08);
+
+  /* Toggle/filter buttons (day tabs, court visibility, indoor/outdoor,
+     etc.) get their own "active" color, deliberately different from
+     --color-primary — buttons that trigger an action (e.g. "Plan
+     bearbeiten") stay primary-blue, so blue consistently means "click me
+     to do something" while this violet means "this is currently on". */
+  --color-toggle: #7c3aed;
+  --color-toggle-hover: #6d28d9;
+  --color-toggle-fg: #ffffff;
+
   /* ---------- Spacing ---------- */
   --space-1: 4px;
   --space-2: 8px;
@@ -73,6 +85,13 @@
     --color-primary-hover: #3b82f6;
     --color-primary-soft: #1e2a4a;
     --color-primary-fg: #0b1020;
+
+    --color-avail: #34d399;
+    --color-avail-hover: rgba(52, 211, 153, 0.08);
+
+    --color-toggle: #a78bfa;
+    --color-toggle-hover: #8b5cf6;
+    --color-toggle-fg: #16101f;
   }
 }
 
@@ -96,7 +115,11 @@ body {
   font-size: var(--text-base);
   line-height: 1.5;
   color: var(--color-text);
-  background: var(--color-bg);
+  background:
+    radial-gradient(ellipse 80% 50% at 90% -5%,  rgba(37, 99, 235, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 35% at -5% 95%, rgba(5, 150, 105, 0.05) 0%, transparent 55%),
+    var(--color-bg);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -113,6 +136,26 @@ h4 {
 h1 { font-size: var(--text-2xl); font-weight: 700; }
 h2 { font-size: var(--text-xl); font-weight: 650; }
 h3 { font-size: var(--text-lg); font-weight: 600; }
+
+/* Page-level title: first h2 directly inside a section gets a color-bar accent */
+section > h2:first-child {
+  position: relative;
+  padding-left: var(--space-4);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  margin-bottom: var(--space-5);
+}
+section > h2:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to bottom, var(--color-primary), var(--color-accent));
+}
 
 p { margin: 0 0 var(--space-3) 0; color: var(--color-text-muted); }
 
@@ -134,6 +177,16 @@ code, pre {
   background: var(--color-bg);
 }
 
+.app-content {
+  transition: filter 0.25s ease;
+}
+
+.app-content--blurred {
+  filter: blur(14px);
+  pointer-events: none;
+  user-select: none;
+}
+
 .app-nav {
   position: sticky;
   top: 0;
@@ -142,31 +195,45 @@ code, pre {
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-3) var(--space-5);
-  background: var(--color-surface);
+  background: rgba(255, 255, 255, 0.88);
   border-bottom: 1px solid var(--color-border);
-  backdrop-filter: saturate(140%) blur(8px);
+  box-shadow: 0 1px 0 var(--color-border), 0 4px 16px rgba(15, 23, 42, 0.04);
+  backdrop-filter: saturate(180%) blur(14px);
   flex-wrap: wrap;
+}
+
+@media (prefers-color-scheme: dark) {
+  .app-nav { background: rgba(22, 26, 35, 0.88); }
 }
 
 .app-nav__brand {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-weight: 700;
-  font-size: var(--text-md);
-  color: var(--color-text);
-  letter-spacing: -0.01em;
+  font-weight: 800;
+  font-size: var(--text-lg);
+  letter-spacing: -0.035em;
   margin-right: var(--space-4);
+  background: linear-gradient(120deg, var(--color-primary) 0%, #0ea5e9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .app-nav__brand-dot {
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+  background: linear-gradient(135deg, var(--color-primary), #0ea5e9);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  flex-shrink: 0;
 }
 
-.app-nav__link {
+/* Qualified with the .app-nav ancestor so this reliably beats the generic
+   button:hover rule further down — otherwise a <button> (e.g. "Abmelden")
+   and an <a>/NavLink (e.g. "Mein Konto") end up with different hover looks
+   depending on which selector happens to win. */
+.app-nav .app-nav__link {
   display: inline-flex;
   align-items: center;
   padding: var(--space-2) var(--space-3);
@@ -174,14 +241,23 @@ code, pre {
   color: var(--color-text-muted);
   font-weight: 500;
   font-size: var(--text-sm);
+  font-family: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.app-nav__link:hover {
+.app-nav .app-nav__link:hover {
   text-decoration: none;
   background: var(--color-surface-muted);
   color: var(--color-text);
 }
-.app-nav__link--active {
+.app-nav .app-nav__link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.app-nav .app-nav__link--active {
   background: var(--color-primary-soft);
   color: var(--color-primary);
 }
@@ -193,17 +269,22 @@ code, pre {
 .subnav {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin: calc(-1 * var(--space-3)) 0 var(--space-4);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--color-border);
+  gap: 2px;
+  margin-bottom: var(--space-5);
+  padding: 3px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  width: fit-content;
+  box-shadow: var(--shadow-sm);
 }
 .subnav__link {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
+  padding: 6px var(--space-4);
+  border-radius: var(--radius-pill);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .subnav__link:hover {
   text-decoration: none;
@@ -211,14 +292,15 @@ code, pre {
   color: var(--color-text);
 }
 .subnav__link--active {
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.3);
 }
 
 .app-main {
-  max-width: 1180px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: var(--space-6) var(--space-5);
+  padding: var(--space-7) var(--space-6);
 }
 
 /* ---------- Card ---------- */
@@ -230,6 +312,11 @@ code, pre {
   padding: var(--space-5);
   box-shadow: var(--shadow-sm);
   margin-bottom: var(--space-4);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .card__title {
@@ -266,7 +353,7 @@ button:active:not(:disabled) { transform: translateY(1px); }
 button:disabled,
 .btn:disabled {
   opacity: 0.55;
-  cursor: not-allowed;
+  cursor: default;
 }
 
 .btn--secondary {
@@ -276,6 +363,18 @@ button:disabled,
 }
 .btn--secondary:hover:not(:disabled) {
   background: var(--color-surface-muted);
+}
+
+/* "Currently on" state for filter/toggle buttons (day tabs, court
+   visibility, indoor/outdoor, ...) — deliberately not --color-primary, see
+   the --color-toggle token comment. */
+.btn--toggle-active {
+  background: var(--color-toggle);
+  color: var(--color-toggle-fg);
+  border-color: transparent;
+}
+.btn--toggle-active:hover:not(:disabled) {
+  background: var(--color-toggle-hover);
 }
 
 .btn--ghost {
@@ -318,6 +417,12 @@ textarea:focus {
   box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 input[type="number"] { max-width: 160px; }
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  padding: 0;
+  flex-shrink: 0;
+}
 
 label {
   display: inline-flex;
@@ -325,6 +430,14 @@ label {
   gap: var(--space-1);
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+}
+
+.label--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 500;
+  color: var(--color-text);
 }
 
 /* ---------- Tables ---------- */
@@ -351,6 +464,107 @@ th {
   letter-spacing: 0.04em;
 }
 tr:last-child td { border-bottom: none; }
+tbody tr td { transition: background 0.1s ease; }
+tbody tr:hover td { background: var(--color-surface-muted); }
+.table-actions { display: flex; gap: var(--space-2); align-items: center; }
+
+/* ---------- Tabs (pill segment control) ---------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  width: fit-content;
+}
+
+.tab {
+  padding: 6px var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: none;
+}
+
+.tab:hover:not(:disabled) {
+  color: var(--color-text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tab--active,
+.tab--active:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+/* ---------- Availability Grid ---------- */
+
+.avail-grid {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-xs);
+}
+
+.avail-header {
+  background: var(--color-surface-muted);
+  padding: var(--space-2) var(--space-1);
+  text-align: center;
+  font-weight: 700;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.avail-time {
+  background: var(--color-surface-muted);
+  padding: 0 var(--space-2);
+  text-align: right;
+  color: var(--color-text-soft);
+  font-size: 11px;
+  line-height: 22px;
+}
+
+.avail-grid .avail-cell {
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--color-surface);
+  color: transparent;
+  font-size: 0;
+  transition: background 0.06s ease;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.avail-grid .avail-cell:hover:not(:disabled) {
+  background: var(--color-avail-hover);
+}
+
+.avail-grid .avail-cell--on,
+.avail-grid .avail-cell--on:hover:not(:disabled) {
+  background: var(--color-avail);
+}
+
+.avail-grid .avail-cell:active:not(:disabled) {
+  transform: none;
+}
+
+.avail-grid .avail-cell:disabled {
+  opacity: 1;
+  cursor: default;
+}
 
 /* ---------- List clean-up ---------- */
 ul {
@@ -376,6 +590,63 @@ ul.clean {
 .pill--accent { background: var(--color-primary-soft); color: var(--color-primary); }
 .pill--success { background: rgba(22, 163, 74, 0.12); color: var(--color-accent); }
 .pill--danger { background: rgba(220, 38, 38, 0.10); color: var(--color-danger); }
+
+/* ---------- User admin (Benutzerverwaltung) ---------- */
+/* Fixed grid columns so a row with 🔒 or with/without link badges never
+   shifts other cells out of alignment with sibling rows. */
+.useradmin-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 14px 20px minmax(160px, 1fr) 90px 100px minmax(160px, 1.4fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--color-text);
+}
+
+.useradmin-grid {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) 150px auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.useradmin-checkbox {
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.useradmin-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.useradmin-link-picker {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+@media (max-width: 720px) {
+  .useradmin-row {
+    grid-template-columns: 14px 20px 1fr;
+  }
+  .useradmin-row > :nth-child(4),
+  .useradmin-row > :nth-child(5),
+  .useradmin-row > :nth-child(6) {
+    display: none;
+  }
+  .useradmin-grid,
+  .useradmin-links {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ---------- Utility helpers ---------- */
 
@@ -501,4 +772,374 @@ ul.clean {
 
 @media (max-width: 640px) {
   .chatdock { width: 100vw; }
+}
+
+/* =========================================================
+   Nav Menu overlay (grid-icon → tile panel)
+   ========================================================= */
+
+.navmenu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  box-shadow: none;
+  align-self: center;
+  flex-shrink: 0;
+}
+.navmenu__trigger:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+@keyframes navmenu-bg {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes navmenu-panel {
+  from { opacity: 0; transform: scale(0.96) translateY(-10px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+/* The actual blurring happens on .app-content (the real page behind the
+   panel) — see below. This overlay just catches outside-clicks and adds a
+   light scrim so the tiles stay legible over busy backgrounds. */
+.navmenu {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(11, 17, 32, 0.28);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: calc(56px + var(--space-6));
+  animation: navmenu-bg 0.18s ease;
+}
+
+/* No box around the tiles on purpose — they float directly over the
+   blurred page. */
+.navmenu__panel {
+  width: min(640px, 92vw);
+  animation: navmenu-panel 0.2s ease;
+}
+
+.navmenu__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.navmenu__title {
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: -0.02em;
+}
+
+.navmenu__close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 5px 7px;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.navmenu__close:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.navmenu__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.navmenu__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.8);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, color 0.15s ease;
+  text-align: center;
+}
+.navmenu__tile:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.22);
+  transform: translateY(-2px);
+  text-decoration: none;
+  color: #fff;
+}
+
+.navmenu__tile-icon {
+  font-size: 34px;
+  line-height: 1;
+  display: block;
+}
+
+.navmenu__tile-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+/* ---------- Indeterminate progress bar (background job polling) ---------- */
+
+@keyframes progress-indeterminate-slide {
+  0%   { left: -40%; width: 40%; }
+  50%  { left: 30%;  width: 45%; }
+  100% { left: 100%; width: 40%; }
+}
+
+.progress-indeterminate {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+.progress-indeterminate::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  animation: progress-indeterminate-slide 1.3s ease-in-out infinite;
+}
+
+/* =========================================================
+   Homepage
+   ========================================================= */
+
+@keyframes home-fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.home {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-7) var(--space-5);
+  gap: var(--space-7);
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -10%, rgba(37, 99, 235, 0.35) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(5, 150, 105, 0.2) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 30% at -5% 60%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+    #0b1120;
+}
+
+.home__account-bar {
+  position: fixed;
+  top: var(--space-5);
+  right: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  z-index: 10;
+}
+
+.home__account-bar .home__account-link {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 4px;
+  font-family: inherit;
+}
+
+.home__account-bar .home__account-link:hover {
+  color: #fff;
+  background: none;
+  text-decoration: none;
+}
+
+.home__hero {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  animation: home-fade-up 0.55s ease both;
+}
+
+.home__logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #fff;
+  line-height: 1;
+}
+
+.home__logo-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #60a5fa, #34d399);
+  box-shadow: 0 0 18px rgba(96, 165, 250, 0.7), 0 0 40px rgba(96, 165, 250, 0.3);
+  flex-shrink: 0;
+}
+
+.home__tagline {
+  font-size: var(--text-lg);
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  max-width: 400px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.home__cta {
+  margin-top: var(--space-2);
+  padding: 12px 36px;
+  font-size: var(--text-md);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  box-shadow: 0 4px 24px rgba(37, 99, 235, 0.45);
+  color: #fff !important;
+  -webkit-text-fill-color: #fff;
+  font-weight: 600;
+  border: none;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.home__cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(37, 99, 235, 0.55);
+  text-decoration: none;
+}
+
+/* Login form on dark homepage */
+.home__login {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 320px;
+  animation: home-fade-up 0.55s ease 0.15s both;
+}
+
+.home__login input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-md);
+  color: #fff;
+  padding: 12px 16px;
+  font-size: var(--text-base);
+  width: 100%;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.home__login input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+.home__login input:focus {
+  outline: none;
+  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+.home__login-err {
+  color: #fca5a5;
+  font-size: var(--text-sm);
+  margin: 0;
+  text-align: center;
+}
+
+.home__grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 820px;
+  animation: home-fade-up 0.55s ease 0.15s both;
+}
+
+.home__tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 0 1 240px;
+  padding: var(--space-5);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(16px);
+  text-decoration: none;
+  color: #fff;
+  transition: background 0.2s ease, transform 0.25s ease,
+              box-shadow 0.25s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+
+.home__tile:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+  text-decoration: none;
+}
+
+.home__tile-icon {
+  font-size: 30px;
+  line-height: 1;
+  margin-bottom: var(--space-1);
+  display: block;
+}
+
+.home__tile-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.015em;
+}
+
+.home__tile-desc {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.48);
+  line-height: 1.55;
+}
+
+.home__footer {
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.25);
+  animation: home-fade-up 0.55s ease 0.3s both;
+}
+
+@media (max-width: 500px) {
+  .home__grid { max-width: 340px; }
+  .home__tile { flex-basis: 100%; }
+  .home__logo { font-size: 30px; }
+  .home__tagline { font-size: var(--text-base); }
 }

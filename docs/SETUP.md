@@ -22,7 +22,8 @@ Eine Webseite (z. B. `https://coach.dein-verein.de`), die du und alle Trainer/Sc
 8. [Erste Daten anlegen und Plan rechnen](#8-erste-daten-anlegen-und-plan-rechnen)
 9. [Tägliche Bedienung & Wartung](#9-tägliche-bedienung--wartung)
 10. [Datensicherung (Backup)](#10-datensicherung-backup)
-11. [Wenn etwas nicht funktioniert](#11-wenn-etwas-nicht-funktioniert)
+11. [Umzug auf einen neuen Rechner / in die Cloud](#11-umzug-auf-einen-neuen-rechner--in-die-cloud)
+12. [Wenn etwas nicht funktioniert](#12-wenn-etwas-nicht-funktioniert)
 
 ---
 
@@ -33,7 +34,7 @@ Eine Webseite (z. B. `https://coach.dein-verein.de`), die du und alle Trainer/Sc
 | Komponente | Mindestens | Empfohlen |
 |---|---|---|
 | CPU | 2 Kerne | 4 Kerne |
-| RAM | 4 GB (ohne Chat-Assistent) | 8 GB (mit Chat-Assistent) |
+| RAM | 2 GB | 4 GB |
 | Speicher | 10 GB frei | 20 GB frei |
 | Internet | DSL 16 MBit/s | egal, was vorhanden |
 
@@ -120,9 +121,8 @@ Die App braucht ein paar Geheimnisse (Passwörter), die nur du kennen sollst.
    **Nur wenn du Variante A (eigene Domain) in [Schritt 7](#7-von-überall-erreichbar-machen-cloudflare-tunnel) wählst,** zusätzlich:
    ```
    DOMAIN=coach.dein-verein.de
-   TLS_EMAIL=du@deine-email.de
    ```
-   Bei Variante B (ohne Domain) lässt du `DOMAIN=localhost` einfach so stehen.
+   Bei Variante B (ohne Domain) lässt du `DOMAIN=localhost` einfach so stehen. `TLS_EMAIL` kannst du unverändert lassen — Caddy nutzt für die interne Verbindung ohnehin immer ein selbstsigniertes Zertifikat (`tls internal`), die öffentliche Verschlüsselung übernimmt Cloudflare an dessen Edge.
 
 3. Sicheres `API_SECRET_KEY` generieren – in einer **zweiten** PowerShell:
    ```powershell
@@ -146,9 +146,7 @@ docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
 
 > 💡 **Wichtig:** Das `--env-file .env` muss bei **allen** `docker compose`-Befehlen mit angegeben werden, weil die Compose-Datei in `deploy/` liegt, die `.env` aber im Hauptordner. Ohne diesen Parameter findet Docker die Konfiguration nicht.
 
-Das dauert beim **ersten** Mal 5–15 Minuten:
-- Container werden gebaut.
-- Wenn du das volle Setup nutzt, lädt der Chat-Assistent ca. 5 GB Modell-Dateien herunter.
+Das dauert beim **ersten** Mal 5–15 Minuten (Python-Pakete und npm werden installiert).
 
 Status prüfen:
 ```powershell
@@ -166,25 +164,24 @@ Erster Test: Browser öffnen → http://localhost
 
 ## 6. Admin-Account anlegen
 
-1. Im Browser: `http://localhost/api/docs` öffnen.
-2. Den Abschnitt **`auth → POST /auth/register`** suchen, auf „Try it out" klicken.
-3. Daten eingeben:
-   ```json
-   {
-     "email": "admin@dein-verein.de",
-     "password": "ein-sehr-langes-passwort-mind-12-zeichen"
-   }
+Aus Sicherheitsgründen kann sich hier **niemand selbst registrieren** — Konten werden ausschließlich von einem Admin über die Benutzerverwaltung angelegt. Für den *allerersten* Account (es gibt ja noch keinen Admin) gibt es deshalb einen einmaligen Kommandozeilen-Befehl:
+
+1. In der PowerShell, im Repo-Ordner:
+   ```powershell
+   docker compose --env-file .env -f deploy/docker-compose.yml exec api `
+     python -m coach_api.scripts.create_admin admin@dein-verein.de "ein-sehr-langes-passwort-mind-12-zeichen"
    ```
-4. „Execute" klicken. Antwort sollte `201` zeigen.
-5. **Den User zum Admin machen:** zurück in die PowerShell:
+   (E-Mail und Passwort anpassen.) Die Ausgabe sollte `Admin-Account angelegt: admin@dein-verein.de` zeigen.
+
+2. Im Browser auf http://localhost öffnen → „Anmelden" → mit den Daten einloggen.
+
+3. **Optional — Master-Admin-Schutz:** Willst du, dass dein eigener Account niemals von einem anderen Admin geändert oder gelöscht werden kann (auch nicht versehentlich)? Dann direkt danach:
    ```powershell
    docker compose --env-file .env -f deploy/docker-compose.yml exec db `
      psql -U coach -d coach_assistant `
-     -c "UPDATE users SET is_superuser=true, is_verified=true, role='ADMIN' WHERE email='admin@dein-verein.de';"
+     -c "UPDATE users SET is_protected=true WHERE email='admin@dein-verein.de';"
    ```
-   (E-Mail im Befehl anpassen.)
-
-6. Im Browser auf http://localhost öffnen → „Anmelden" → mit den Daten einloggen.
+   Das lässt sich absichtlich **nur** direkt in der Datenbank setzen, nicht über die Oberfläche — so kann kein anderer Admin diesen Schutz aufheben.
 
 ---
 
@@ -216,6 +213,8 @@ Es gibt **zwei Varianten** — wähle eine:
 4. Diese Nameserver bei deinem Domain-Anbieter (wo du die Domain gekauft hast) eintragen. Anleitung dort meist unter „DNS" oder „Nameserver". Nach dem Speichern dauert es bis zu 24 Stunden, meist aber nur ein paar Minuten.
 5. Sobald Cloudflare „Active" anzeigt, geht's weiter.
 
+> ⚠️ **Falls dein Domain-Anbieter die Nameserver-Änderung blockiert** (z. B. Meldung „Hosting ist an ein Paket gebunden, manche Änderungen sind eingeschränkt"): Das kommt bei manchen Billig-Registraren vor, wenn die Domain an ein Hosting-/Parking-Produkt gebunden ist. Entweder beim Support um Freischaltung bitten, oder — deutlich einfacher — **eine neue, kleine Domain direkt bei Cloudflare selbst kaufen** (im Dashboard unter „Domain Registration", ~10 €/Jahr). Die ist dann von Anfang an frei verwaltbar, ganz ohne Nameserver-Umzug.
+
 #### A.2 Tunnel erstellen
 
 1. In Cloudflare links im Menü: **Zero Trust** → bei der ersten Nutzung musst du einen kostenlosen Plan auswählen (Kreditkarte abfragen, wird aber nicht belastet).
@@ -228,26 +227,15 @@ Es gibt **zwei Varianten** — wähle eine:
    ```
    Den **Token** (die langen Buchstaben/Zahlen nach `--token`) kopieren.
 
-#### A.3 Tunnel zur App hinzufügen
+#### A.3 Token eintragen
 
-PowerShell, im Repo-Ordner:
+Der `cloudflared`-Dienst ist bereits fertig in `deploy/docker-compose.yml` eingerichtet — du musst dort nichts bearbeiten. Nur den Token brauchst du noch in deiner `.env`:
 
 ```powershell
-notepad deploy\docker-compose.yml
+notepad .env
 ```
 
-Am Ende der Datei (vor `volumes:`) folgenden Block einfügen:
-
-```yaml
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    networks: [internal]
-    depends_on: [caddy]
-```
-
-In `.env` am Ende anhängen:
+Zeile suchen und den kopierten Token einfügen:
 ```
 CLOUDFLARE_TUNNEL_TOKEN=<den Token hier einfügen>
 ```
@@ -262,12 +250,16 @@ docker compose --env-file .env -f deploy/docker-compose.yml up -d
 Zurück in Cloudflare beim Tunnel:
 
 1. **Public Hostname** → **Add a public hostname**
-2. Subdomain: `coach`
+2. Subdomain: `coach` (oder leer lassen, wenn die App direkt unter der nackten Domain laufen soll)
 3. Domain: `dein-verein.de`
 4. Service-Type: **HTTPS**
 5. URL: `caddy:443`
-6. Unter **Additional application settings → TLS** → **No TLS Verify** aktivieren (weil Caddy intern selbst-signiert)
+6. Unter **Additional application settings → TLS**:
+   - **No TLS Verify** aktivieren (weil Caddy intern selbst-signiert ist)
+   - **Origin Server Name** auf **exakt deine Domain** setzen (z. B. `coach.dein-verein.de`) — **dieser Schritt ist Pflicht, nicht optional!** Ohne ihn schickt der Tunnel beim TLS-Handshake den Servernamen `caddy` statt deiner Domain, Caddy findet dann kein passendes Zertifikat und du bekommst „502 Bad Gateway" bzw. im Log `remote error: tls: internal error`.
 7. **Save**.
+
+> 💡 In `deploy/Caddyfile` ist bereits `tls internal` fest hinterlegt (Caddy nutzt also immer sein eigenes, selbstsigniertes Zertifikat für die interne Verbindung zum Tunnel) — daran musst du nichts ändern, das ist schon vorbereitet.
 
 #### A.5 Fertig!
 
@@ -279,35 +271,20 @@ Browser öffnen: `https://coach.dein-verein.de` – die App ist jetzt **weltweit
 
 Komplett kostenlos, nur ein Befehl. Die Adresse ist hässlich (`https://abc-def-ghi.trycloudflare.com`), aber funktioniert.
 
-#### B.1 Tunnel-Service zur App hinzufügen
+#### B.1 Quick Tunnel starten
 
-PowerShell, im Repo-Ordner:
-
-```powershell
-notepad deploy\docker-compose.yml
-```
-
-Am Ende der Datei (vor `volumes:`) folgenden Block einfügen:
-
-```yaml
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    restart: unless-stopped
-    command: tunnel --no-autoupdate --url https://caddy:443 --no-tls-verify
-    networks: [internal]
-    depends_on: [caddy]
-```
-
-Anwenden:
+Der in `docker-compose.yml` enthaltene `cloudflared`-Dienst ist für den dauerhaften Tunnel mit Token gedacht (Variante A). Für den kostenlosen Quick Tunnel ohne eigene Domain reicht ein einzelner, separater Docker-Befehl daneben — die App selbst (`caddy`, `api`, `web`, …) muss dafür bereits laufen (Schritt 5):
 
 ```powershell
-docker compose --env-file .env -f deploy/docker-compose.yml up -d
+docker run -d --name quick-tunnel --network coach-assistant_internal cloudflare/cloudflared:latest tunnel --no-autoupdate --url https://caddy:443 --no-tls-verify --http-host-header=localhost
 ```
+
+> 💡 Der `--http-host-header=localhost`-Teil ist wichtig: Ohne ihn leitet Cloudflare die von außen sichtbare (zufällige) Adresse als Host-Header weiter, Caddy kennt aber nur `localhost` als gültigen Namen und lehnt die Anfrage sonst mit „502 Bad Gateway" ab.
 
 #### B.2 Adresse herausfinden
 
 ```powershell
-docker compose --env-file .env -f deploy/docker-compose.yml logs cloudflared
+docker logs quick-tunnel
 ```
 
 In der Ausgabe siehst du eine Zeile wie:
@@ -318,7 +295,9 @@ https://stupid-fox-loud-mountain.trycloudflare.com
 
 Diese Adresse ist deine App-URL. Browser öffnen → fertig. Alle, die den Link haben, können die App nutzen.
 
-> ⚠️ **Wichtig:** Bei jedem Neustart des `cloudflared`-Containers bekommst du eine **neue zufällige Adresse**. Für Dauerbetrieb deshalb besser Variante A. Aber: Solange du den Container nicht stoppst (oder neu startest), bleibt die Adresse stabil.
+> ⚠️ **Wichtig:** Bei jedem Neustart des `quick-tunnel`-Containers bekommst du eine **neue zufällige Adresse**. Für Dauerbetrieb deshalb besser Variante A. Aber: Solange du den Container nicht stoppst (oder neu startest), bleibt die Adresse stabil.
+>
+> Zum Beenden: `docker rm -f quick-tunnel` (läuft außerhalb von Docker Compose, wird also nicht automatisch mit `docker compose down` gestoppt).
 
 ---
 
@@ -369,22 +348,71 @@ powercfg /change standby-timeout-ac 0
 
 **Sehr wichtig** — sonst sind im Defekt-Fall alle Pläne weg.
 
+Die Backups werden **vor** dem Ablegen im Cloud-Ordner mit AES-256 verschlüsselt (Passwort aus
+`.env`, siehe unten) — dadurch sieht auch der Cloud-Anbieter (z. B. OneDrive) nur eine unlesbare
+`.sql.enc`-Datei, keine Klartext-Personendaten.
+
 Tägliches Backup einrichten:
 
-1. Backup-Ordner anlegen, z. B. `C:\Backups\coach`. Idealerweise ein Cloud-synchronisierter Ordner (OneDrive, Dropbox).
-2. Datei `C:\Backups\coach\backup.ps1` erstellen mit Inhalt:
+1. Verschlüsselungspasswort in `.env` erzeugen (falls noch nicht geschehen, siehe [Schritt 4](#4-konfiguration-anpassen-env)):
    ```powershell
+   [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Max 256 }))
+   ```
+   In `.env` als `BACKUP_ENCRYPTION_PASSWORD=...` eintragen und **sicher aufbewahren** (z. B.
+   Passwort-Manager) — ohne dieses Passwort sind die Backups im Ernstfall nicht wiederherstellbar.
+2. Backup-Ordner anlegen, z. B. `C:\Backups\coach`. Idealerweise ein Cloud-synchronisierter Ordner (OneDrive, Dropbox).
+3. Datei `C:\Backups\coach\backup.ps1` erstellen mit Inhalt:
+   ```powershell
+   $ErrorActionPreference = "Stop"
+
+   $repo = "C:\Git_Repos\coach_assistant"
+   $backupDir = "C:\Backups\coach"
    $date = Get-Date -Format 'yyyy-MM-dd'
-   $out = "C:\Backups\coach\coach-$date.sql"
-   docker compose --env-file C:\Git_Repos\coach_assistant\.env `
-     -f C:\Git_Repos\coach_assistant\deploy\docker-compose.yml `
-     exec -T db pg_dump -U coach coach_assistant > $out
+   $plainFile = Join-Path $backupDir "coach-$date.sql"
+   $encFile = "$plainFile.enc"
+
+   $pwLine = Get-Content "$repo\.env" | Where-Object { $_ -match '^BACKUP_ENCRYPTION_PASSWORD=' }
+   if (-not $pwLine) { throw "BACKUP_ENCRYPTION_PASSWORD fehlt in .env" }
+   $password = $pwLine -replace '^BACKUP_ENCRYPTION_PASSWORD=', ''
+   if ([string]::IsNullOrWhiteSpace($password)) { throw "BACKUP_ENCRYPTION_PASSWORD ist leer" }
+
+   docker compose --env-file "$repo\.env" -f "$repo\deploy\docker-compose.yml" `
+     exec -T db pg_dump -U coach coach_assistant > $plainFile
+
+   # --- AES-256 verschlüsseln (Salt + IV werden vorangestellt) ---
+   $salt = New-Object byte[] 16
+   [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($salt)
+   $iv = New-Object byte[] 16
+   [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($iv)
+
+   $deriveBytes = New-Object System.Security.Cryptography.Rfc2898DeriveBytes($password, $salt, 100000, [System.Security.Cryptography.HashAlgorithmName]::SHA256)
+   $key = $deriveBytes.GetBytes(32)
+
+   $aes = [System.Security.Cryptography.Aes]::Create()
+   $aes.Key = $key
+   $aes.IV = $iv
+   $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
+
+   $plainBytes = [System.IO.File]::ReadAllBytes($plainFile)
+   $encryptor = $aes.CreateEncryptor()
+   $cipherBytes = $encryptor.TransformFinalBlock($plainBytes, 0, $plainBytes.Length)
+
+   $outStream = [System.IO.File]::Create($encFile)
+   $outStream.Write($salt, 0, $salt.Length)
+   $outStream.Write($iv, 0, $iv.Length)
+   $outStream.Write($cipherBytes, 0, $cipherBytes.Length)
+   $outStream.Close()
+   $aes.Dispose()
+
+   # Klartext-Datei löschen — nur die verschlüsselte Version bleibt und synct in die Cloud
+   Remove-Item $plainFile -Force
+
    # alte Backups (>30 Tage) löschen
-   Get-ChildItem C:\Backups\coach\coach-*.sql |
+   Get-ChildItem "$backupDir\coach-*.sql.enc" |
      Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-30) } |
      Remove-Item
    ```
-3. Im Windows-Aufgabenplaner einen täglichen Job anlegen:
+4. Im Windows-Aufgabenplaner einen täglichen Job anlegen:
    - **Aufgabenplaner öffnen** → „Aufgabe erstellen"
    - Name: `Coach Assistant Backup`
    - Trigger: Täglich, z. B. 03:00 Uhr
@@ -392,22 +420,70 @@ Tägliches Backup einrichten:
 
 ### Wiederherstellung
 
-Im Notfall:
+Im Notfall zuerst entschlüsseln, dann einspielen:
 ```powershell
-Get-Content C:\Backups\coach\coach-YYYY-MM-DD.sql | `
+.\deploy\restore-decrypt.ps1 -EncFile "C:\Backups\coach\coach-YYYY-MM-DD.sql.enc" -OutFile ".\restore.sql"
+Get-Content .\restore.sql | `
   docker compose --env-file .env -f deploy/docker-compose.yml exec -T db psql -U coach coach_assistant
 ```
+`restore-decrypt.ps1` liest das Passwort automatisch aus `BACKUP_ENCRYPTION_PASSWORD` in `.env`.
 
 ---
 
-## 11. Wenn etwas nicht funktioniert
+## 11. Umzug auf einen neuen Rechner / in die Cloud
+
+Der Laptop, auf dem du ursprünglich installiert hast, muss nicht für immer der Host bleiben. Weil alles in Docker läuft, ist ein Umzug — z. B. auf einen Mini-PC zuhause oder einen Cloud-Server — unkompliziert und **ohne Datenverlust** möglich. Es gibt nur drei Dinge, die mitgenommen werden müssen: die `.env`-Datei, ein Datenbank-Dump und (falls genutzt) der Cloudflare-Tunnel-Token.
+
+> 💡 **Der Cloudflare Tunnel muss dabei nicht neu eingerichtet werden.** Der Token ist nicht an eine bestimmte Maschine gebunden — sobald `cloudflared` mit demselben Token auf dem neuen Rechner läuft, verbindet sich der bestehende Tunnel einfach von dort aus neu. Im Cloudflare-Dashboard ist nichts zu tun.
+
+### 11.1 Auf der alten Maschine
+
+1. Frisches Backup erstellen (siehe [Schritt 10](#10-datensicherung-backup), z. B. `.\backup.ps1`
+   einmal manuell ausführen) oder die neueste `coach-YYYY-MM-DD.sql.enc`-Datei aus dem Backup-Ordner
+   nehmen. Sie ist bereits AES-256-verschlüsselt und kann daher gefahrlos z. B. per USB-Stick oder
+   Cloud-Speicher transportiert werden.
+2. Die Datei `.env` aus dem Repo-Hauptordner sichern (z. B. auf einen USB-Stick oder verschlüsselt per Cloud-Speicher übertragen — sie enthält alle Passwörter/Secrets **und** das Backup-Verschlüsselungspasswort, also **nicht** unverschlüsselt per E-Mail verschicken).
+3. Die `.sql.enc`-Datei ebenfalls mitnehmen.
+
+### 11.2 Auf der neuen Maschine
+
+1. [Schritt 2](#2-docker-installieren) (Docker installieren) und [Schritt 3](#3-coach-assistant-herunterladen) (Repo klonen) durchführen.
+2. Die gesicherte `.env`-Datei unverändert in den neuen Repo-Ordner kopieren (Schritt 4 entfällt dadurch — nichts neu generieren, sonst passen z. B. Datenbank-Passwort und `API_SECRET_KEY` nicht mehr zu den alten Daten).
+3. **Nur die Datenbank starten** (wichtig — noch nicht die ganze App, sonst legt die API beim Start ein leeres Datenbank-Schema an und der Restore schlägt fehl):
+   ```powershell
+   docker compose --env-file .env -f deploy/docker-compose.yml up -d db
+   ```
+   Kurz warten, bis `docker compose --env-file .env -f deploy/docker-compose.yml ps` bei `db` „healthy" zeigt.
+4. Backup entschlüsseln und einspielen:
+   ```powershell
+   .\deploy\restore-decrypt.ps1 -EncFile coach-YYYY-MM-DD.sql.enc -OutFile .\umzug.sql
+   Get-Content umzug.sql | docker compose --env-file .env -f deploy/docker-compose.yml exec -T db psql -U coach coach_assistant
+   ```
+5. Jetzt den kompletten Stack starten:
+   ```powershell
+   docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
+   ```
+   Alle Trainingspläne, Spieler, Trainer und Benutzerkonten sind jetzt da — Schritt 6 (Admin anlegen) entfällt, der Admin-Account ist ja schon im Backup enthalten.
+6. Falls du einen dauerhaften Cloudflare Tunnel nutzt: `CLOUDFLARE_TUNNEL_TOKEN` steht bereits korrekt in der kopierten `.env` — nichts weiter zu tun, der Tunnel verbindet sich automatisch von der neuen Maschine aus.
+
+### 11.3 Alte Maschine abschalten
+
+**Wichtig:** Sobald die neue Maschine läuft, die App auf der alten Maschine stoppen (`docker compose --env-file .env -f deploy/docker-compose.yml down`) — sonst laufen kurzzeitig zwei Instanzen mit demselben Tunnel-Token gegen zwei unterschiedliche Datenbanken, und spätere Änderungen könnten je nachdem, welche Maschine gerade antwortet, in der falschen Datenbank landen.
+
+> 💡 Die TLS-Zertifikate (Caddy-interne CA) müssen **nicht** mitgenommen werden — Caddy erzeugt sich auf der neuen Maschine beim ersten Start automatisch neue.
+
+---
+
+## 12. Wenn etwas nicht funktioniert
 
 | Symptom | Was tun? |
 |---|---|
 | `https://localhost` lädt nicht | `docker compose -f deploy/docker-compose.yml ps` — alles `healthy`? Sonst Logs ansehen: `docker compose ... logs api` |
-| `https://coach.dein-verein.de` zeigt Cloudflare-Fehlerseite | Tunnel-Status in Cloudflare prüfen (Zero Trust → Tunnels). Container neu starten: `docker compose ... restart cloudflared` |
-| Chat-Assistent antwortet nicht | Modell wird beim ersten Request geladen, das dauert auf langsamen Rechnern bis zu 60 Sek. Geduld. Sonst Logs: `docker compose ... logs ollama` |
-| Container belegt zu viel RAM | In `.env` kleineres LLM-Modell setzen: `OLLAMA_MODEL=qwen2.5:3b`, dann `docker compose ... restart ollama` |
+| `https://coach.dein-verein.de` zeigt „502 Bad Gateway" | Meist fehlt der **Origin Server Name** (siehe [A.4](#a4-domain-mit-der-app-verbinden)) — in den `cloudflared`-Logs steht dann `remote error: tls: internal error`. Im Tunnel unter Public Hostname → Additional application settings → TLS → Origin Server Name exakt auf deine Domain setzen. |
+| `https://coach.dein-verein.de` zeigt Cloudflare-Fehler **1033** | Tunnel-Container läuft nicht oder hat sich neu verbunden (z. B. nach Neustart bei Variante B eine **neue** URL). Logs prüfen: `docker compose ... logs cloudflared`, dort die aktuelle URL ablesen. |
+| `https://coach.dein-verein.de` zeigt sonstige Cloudflare-Fehlerseite | Tunnel-Status in Cloudflare prüfen (Zero Trust → Networks → Tunnels). Container neu starten: `docker compose ... restart cloudflared` |
+| Nameserver-Wechsel bei Cloudflare geht nicht / Anbieter blockiert | Siehe Hinweis in [A.1](#a1-domain-bei-cloudflare-einrichten) — oft hilft eine bei Cloudflare selbst gekaufte Domain |
+| Chat-Assistent antwortet nicht | API-Logs prüfen: `docker compose ... logs api` |
 | Login-Daten vergessen | Direkt in DB neu setzen, siehe [Schritt 6](#6-admin-account-anlegen) — Passwort in DB löschen + neu registrieren |
 | Update kaputt — alles tot | Letzte Version reaktivieren: `git checkout <vorherige-version>; docker compose ... up -d --build` |
 
@@ -430,7 +506,6 @@ Wenn du wissen willst, was auf deinem Server passiert:
 | `worker` | Lange Berechnungen im Hintergrund |
 | `web` | Die Webseite (React) |
 | `caddy` | Reverse-Proxy mit HTTPS |
-| `ollama` | Lokaler KI-Chat (optional) |
 | `cloudflared` | Sicherer Tunnel zu Cloudflare |
 
 Alle Container laufen isoliert; keiner hat Zugriff auf den Rest deines Computers außer auf die definierten Ordner. Datenbank und KI sind **nicht** öffentlich erreichbar — nur über die App.
@@ -441,6 +516,6 @@ Alle Container laufen isoliert; keiner hat Zugriff auf den Rest deines Computers
 
 Der Coach Assistant ist Open Source unter der **AGPL-3.0**-Lizenz. Du darfst ihn frei nutzen, anpassen und teilen.
 
-Da der Server bei dir steht und der KI-Chat lokal läuft, **verlassen keine personenbezogenen Daten deinen Server** (außer dem verschlüsselten HTTPS-Verkehr durch Cloudflare). Siehe `docs/PRIVACY.md` für Details.
+Da der Server bei dir steht und der Chat-Assistent regelbasiert lokal läuft, **verlassen keine personenbezogenen Daten deinen Server** (außer dem verschlüsselten HTTPS-Verkehr durch Cloudflare). Siehe `docs/PRIVACY.md` für Details.
 
 Wenn du den Coach Assistant für andere Personen betreibst, bist du **Verantwortlicher** im Sinne der DSGVO und musst eine Datenschutzerklärung anbieten.

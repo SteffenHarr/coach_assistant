@@ -28,11 +28,23 @@ class TrainingCategory(StrEnum):
     normalisiert.
     """
 
-    KIDS = "kids"          # Kindertraining
-    YOUTH = "youth"        # Jugendtraining
-    ADULTS = "adults"      # Erwachsenentraining
-    TEAM = "team"          # Mannschaftstraining
-    OPEN = "open"          # frei / keine Einschränkung (== leere Menge)
+    ADULTS = "adults"              # Erwachsene
+    TEAM = "team"                  # Mannschaft
+    FOERDERKADER = "foerderkader"  # Förderkader
+    BALLSCHULE = "ballschule"      # Ballschule
+    U8 = "u8"
+    U9 = "u9"
+    U10 = "u10"
+    U12 = "u12"
+    U15 = "u15"
+    U18 = "u18"
+    OPEN = "open"                  # frei / keine Einschränkung (== leere Menge)
+
+
+def compute_age(birth_date: date, *, today: date | None = None) -> int:
+    """Age in whole years as of ``today`` (defaults to the real today)."""
+    today = today or date.today()
+    return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
 
 
 def effective_categories(
@@ -50,13 +62,46 @@ def categories_compatible(
     a: "frozenset[TrainingCategory] | set[TrainingCategory] | None",
     b: "frozenset[TrainingCategory] | set[TrainingCategory] | None",
 ) -> bool:
-    """True, wenn die beiden Kategorie-Mengen zusammen trainieren dürfen.
+    """True, wenn Trainer-Kategorien ``a`` und Spieler-Kategorien ``b``
+    (oder umgekehrt) zusammenpassen — entscheidet, ob ein Trainer einen
+    Spieler überhaupt nehmen darf.
 
-    Regel: leere Menge auf einer Seite = Wildcard; sonst muss die
-    Schnittmenge nicht leer sein.
+    Regel: leere Menge auf einer Seite = Wildcard (passt zu allem); sonst
+    muss die Schnittmenge nicht leer sein. Gilt uneingeschränkt auch für
+    Ballschule/U8 — ein Trainer ohne gesetzte Kategorie darf jede
+    Altersgruppe übernehmen, inklusive der Kleinsten.
     """
     ea = effective_categories(a)
     eb = effective_categories(b)
+    if not ea or not eb:
+        return True
+    return not ea.isdisjoint(eb)
+
+
+def players_can_share_session(
+    a: "frozenset[TrainingCategory] | set[TrainingCategory] | None",
+    b: "frozenset[TrainingCategory] | set[TrainingCategory] | None",
+) -> bool:
+    """True, wenn zwei *Spieler* (nicht Trainer!) zusammen in derselben
+    Session sein dürfen.
+
+    Gleiche Grundregel wie ``categories_compatible`` (leere Menge = "nicht
+    zugewiesen" = passt zu allen anderen Spielern) — mit einer Ausnahme:
+
+    ``BALLSCHULE`` und ``U8`` ("Zwerge"): für die Kleinsten gilt die
+    Wildcard-Ausnahme nicht — ein Ballschule- oder U8-Kind trainiert
+    *ausschließlich* mit anderen Kindern derselben dieser beiden
+    Kategorien, auch nicht mit einem noch nicht kategorisierten (=
+    Wildcard) Spieler. Das schließt auch Ballschule/U8 gegeneinander ein
+    (unterschiedliche Kategorien, also nicht kompatibel, außer ein Kind
+    hat ausnahmsweise beide gesetzt). Welcher *Trainer* die Session leitet,
+    ist davon unberührt — dafür gilt weiterhin ``categories_compatible``.
+    """
+    ea = effective_categories(a)
+    eb = effective_categories(b)
+    _STRICT = {TrainingCategory.BALLSCHULE, TrainingCategory.U8}
+    if ea & _STRICT or eb & _STRICT:
+        return not ea.isdisjoint(eb)
     if not ea or not eb:
         return True
     return not ea.isdisjoint(eb)
@@ -91,6 +136,10 @@ class Coach:
     # Welche Trainings-Kategorien deckt dieser Trainer ab?
     # Leere Menge oder {OPEN} = nimmt jeden Spieler.
     categories: frozenset[TrainingCategory] = field(default_factory=frozenset)
+    # Pausierte/ausgeschiedene Trainer bleiben mit allen Daten erhalten,
+    # werden aber von der Plan-Erstellung ignoriert (siehe
+    # PATCH /coaches/{id}/active) — Alternative zum Löschen.
+    active: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,14 +150,6 @@ class PlayerPreferences:
         {SessionType.SINGLE, SessionType.DOUBLE, SessionType.GROUP}
     )
     notes: str = ""   # Freitext, vom Spieler gepflegt, von Trainern lesbar
-
-
-@dataclass(frozen=True, slots=True)
-class Lesson:
-    """Eine vom Trainer gewünschte Trainingseinheit pro Woche."""
-
-    duration_slots: int        # z.B. 2 Slots = 60 Minuten
-    group_size: int            # 1 = Einzel, 2 = Doppel, 3+ = Gruppe
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,16 +172,19 @@ class Player:
     id: UUID = field(default_factory=uuid4)
     availability: frozenset[int] = field(default_factory=frozenset)
     preferences: PlayerPreferences = field(default_factory=PlayerPreferences)
-    min_slots_per_week: int = 0   # wird aus lessons abgeleitet (Backend)
-    max_slots_per_week: int = 4
+    min_slots_per_week: int = 2   # = 1 Std (2 Slots à 30 Min) — passt zur
+    max_slots_per_week: int = 2   # bestehenden Mindest-Session-Länge von 60 Min
     age: int | None = None
     level_lk: int | None = None        # German LK 1..25 (1=strongest) – nur weicher Bonus
-    lessons: tuple[Lesson, ...] = ()   # gewünschte Einheiten pro Woche
     mates: tuple[PlayerMate, ...] = () # Wunschspieler vom Trainer kuratiert
     # Welche Trainings-Kategorien braucht dieser Spieler? Leere Menge =
     # nicht zugewiesen = Wildcard. Mehrere Kategorien sind möglich
     # (z.B. ein 17-jähriger spielt im Jugend- und Mannschaftstraining).
     categories: frozenset[TrainingCategory] = field(default_factory=frozenset)
+    # Pausierte/ausgeschiedene Spieler bleiben mit allen Daten erhalten,
+    # werden aber von der Plan-Erstellung ignoriert (siehe
+    # PATCH /players/{id}/active) — Alternative zum Löschen.
+    active: bool = True
 
 
 @dataclass(slots=True)
@@ -149,6 +193,12 @@ class Court:
     id: UUID = field(default_factory=uuid4)
     availability: frozenset[int] = field(default_factory=frozenset)
     indoor: bool = False
+    # Solver-Präferenz: bei mehreren gleich guten Optionen wird der Platz
+    # mit der niedrigeren Zahl bevorzugt (0 = am liebsten). Nur ein
+    # Tie-Breaker, kein hartes Constraint — echte Nachfrage/Präferenzen
+    # wiegen immer schwerer. Reihenfolge gilt jeweils nur innerhalb von
+    # Halle/Draußen, nicht platzübergreifend.
+    priority: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +210,25 @@ class TrainingSession:
     player_ids: tuple[UUID, ...]
     slot_indices: tuple[int, ...]   # consecutive
     session_type: SessionType
+    # Freitext statt Spielerliste — für Einheiten, die nicht an einzelne
+    # erfasste Spieler gebunden sind (z.B. eine Mannschaft "Damen 30").
+    # Nur manuell im Plan-Editor gesetzt, der Solver befüllt das nie.
+    label: str | None = None
+    # Kurze Bezeichnung der Einheit (z.B. "U15", "Junioren"), die im Plan
+    # neben dem Trainer steht. Anders als ``label`` ersetzt das die
+    # Spielerliste NICHT, sondern ergänzt sie nur. Rein manuell.
+    note: str | None = None
+    # Weitere Trainer derselben Einheit — z.B. zwei Trainer, die sich eine
+    # große Zwerge-Gruppe auf einem Platz teilen. ``coach_id`` bleibt der
+    # hauptverantwortliche Trainer; der Solver plant immer nur mit diesem
+    # einen und lässt das Feld leer, es wird ausschließlich im Plan-Editor
+    # von Hand gefüllt.
+    extra_coach_ids: tuple[UUID, ...] = ()
+    # Kurznotiz hinter einzelnen Spielernamen, z.B. "Förderkader" oder
+    # "gerade Wochen". Bewusst je (Einheit, Spieler) statt am Spieler
+    # selbst: "gerade Wochen" gilt für genau diese Einheit, nicht generell
+    # für den Spieler. Rein manuell im Plan-Editor.
+    player_notes: dict[UUID, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

@@ -11,6 +11,12 @@
 }
 
 {$DOMAIN} {
+	# Public TLS is terminated at Cloudflare's edge (Cloudflare Tunnel).
+	# Caddy only needs a cert for the internal cloudflared->caddy hop, so we
+	# force the internal self-signed issuer instead of attempting public ACME
+	# (which would fail — port 80 is never reachable from the internet here).
+	tls internal
+
 	encode gzip zstd
 
 	# Global headers that are safe for both SPA and API responses.
@@ -34,7 +40,7 @@
 	# Static SPA — strict CSP only here.
 	handle {
 		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'"
-		reverse_proxy web:80
+		reverse_proxy web:8080
 	}
 
 	# Basic request size limit (defence against accidental huge uploads)

@@ -11,7 +11,6 @@ from coach_api.domain.entities import (
     Coach,
     CoachConstraints,
     Court,
-    Lesson,
     Player,
     PlayerMate,
     PlayerPreferences,
@@ -20,6 +19,7 @@ from coach_api.domain.entities import (
     TrainingCategory,
     TrainingSession,
     WeeklyPlan,
+    compute_age,
 )
 from coach_api.infrastructure.models import (
     CoachORM,
@@ -58,6 +58,20 @@ def _parse_categories(raw: object) -> frozenset[TrainingCategory]:
     return frozenset(out)
 
 
+def _derive_age(pref: dict) -> int | None:
+    """Prefer computing age from ``birth_date``; fall back to a stored
+    ``age`` int for players without one (e.g. admin-managed, no login)."""
+    raw = pref.get("birth_date")
+    if raw:
+        from datetime import date as _date
+
+        try:
+            return compute_age(_date.fromisoformat(raw))
+        except (ValueError, TypeError):
+            pass
+    return pref.get("age")
+
+
 def _coach_from_orm(o: CoachORM) -> Coach:
     c = o.constraints or {}
     return Coach(
@@ -77,12 +91,12 @@ def _coach_from_orm(o: CoachORM) -> Coach:
         ),
         max_group_size=o.max_group_size,
         categories=_parse_categories(c.get("categories")),
+        active=bool(c.get("active", True)),
     )
 
 
 def _player_from_orm(o: PlayerORM) -> Player:
     pref = o.preferences or {}
-    lessons_raw = o.lessons or []
     mates_raw = o.mates or []
     return Player(
         id=o.id,
@@ -98,18 +112,10 @@ def _player_from_orm(o: PlayerORM) -> Player:
         ),
         min_slots_per_week=o.min_slots_per_week,
         max_slots_per_week=o.max_slots_per_week,
-        age=pref.get("age"),
+        age=_derive_age(pref),
         level_lk=pref.get("level_lk"),
         categories=_parse_categories(
             pref.get("categories") if "categories" in pref else pref.get("category")
-        ),
-        lessons=tuple(
-            Lesson(
-                duration_slots=int(l.get("duration_slots", 2)),
-                group_size=int(l.get("group_size", 1)),
-            )
-            for l in lessons_raw
-            if int(l.get("duration_slots", 0)) > 0
         ),
         mates=tuple(
             PlayerMate(
@@ -119,6 +125,7 @@ def _player_from_orm(o: PlayerORM) -> Player:
             for m in mates_raw
             if m.get("player_id")
         ),
+        active=bool(pref.get("active", True)),
     )
 
 
@@ -128,6 +135,7 @@ def _court_from_orm(o: CourtORM) -> Court:
         name=o.name,
         availability=frozenset(o.availability or []),
         indoor=o.indoor,
+        priority=o.priority,
     )
 
 
@@ -148,6 +156,10 @@ def _plan_to_orm(p: WeeklyPlan) -> PlanORM:
                 "player_ids": [str(pid) for pid in s.player_ids],
                 "slot_indices": list(s.slot_indices),
                 "session_type": s.session_type.value,
+                "label": s.label,
+                "note": s.note,
+                "extra_coach_ids": [str(cid) for cid in s.extra_coach_ids],
+                "player_notes": {str(pid): txt for pid, txt in s.player_notes.items()},
             }
             for s in p.sessions
         ],
@@ -167,6 +179,10 @@ def _plan_from_orm(o: PlanORM) -> WeeklyPlan:
                 player_ids=tuple(UUID(pid) for pid in s["player_ids"]),
                 slot_indices=tuple(s["slot_indices"]),
                 session_type=SessionType(s["session_type"]),
+                label=s.get("label"),
+                note=s.get("note"),
+                extra_coach_ids=tuple(UUID(cid) for cid in (s.get("extra_coach_ids") or [])),
+                player_notes={UUID(pid): txt for pid, txt in (s.get("player_notes") or {}).items()},
             )
             for s in (o.sessions or [])
         ),
@@ -241,15 +257,9 @@ class SqlPlayerRepository:
         # Legacy-Single-Value-Feld konsequent entfernen, damit Loader nicht
         # versehentlich auf den alten Wert zur\u00fcckf\u00e4llt.
         old_pref.pop("category", None)
-        # Lessons: aus Domain ableiten und min_slots_per_week konsistent setzen.
-        lessons_json = [
-            {"duration_slots": l.duration_slots, "group_size": l.group_size}
-            for l in player.lessons
-        ]
-        derived_min = sum(l.duration_slots for l in player.lessons)
-        # Wenn der Spieler Lessons hat, leiten wir min_slots davon ab.
-        # Andernfalls behalten wir den vorhandenen Wert (Bestandsdaten).
-        effective_min = derived_min if player.lessons else player.min_slots_per_week
+        effective_min = player.min_slots_per_week
+
+        old_mate_ids = {m.get("player_id") for m in (existing.mates if existing else []) or []}
 
         if existing is None:
             existing = PlayerORM(id=player.id)
@@ -259,16 +269,21 @@ class SqlPlayerRepository:
         existing.preferences = pref
         existing.min_slots_per_week = effective_min
         existing.max_slots_per_week = player.max_slots_per_week
-        existing.lessons = lessons_json
         existing.mates = [
             {"player_id": str(m.player_id), "mandatory": m.mandatory}
             for m in player.mates
         ]
         await self._s.flush()
         # Symmetrie der Mate-Beziehung herstellen: für jeden Mate B von A
-        # sicherstellen, dass A auch in B's Mates ist (mit dem selben
-        # mandatory-Flag - mandatory "gewinnt", falls Konflikt).
-        await _mirror_mates(self._s, player.id, player.mates)
+        # sicherstellen, dass A auch in B's Mates ist (mit demselben
+        # mandatory-Flag) — und für jeden früheren Mate, der jetzt nicht
+        # mehr in A's Liste steht, A auch aus dessen Liste wieder entfernen
+        # (sonst bleibt eine einseitige "Geister"-Verbindung stehen, siehe
+        # Bugreport: Partner erschien fälschlich noch bei anderen Spielern
+        # als ausgewählt, obwohl er längst wieder entfernt worden war).
+        new_mate_ids = {str(m.player_id) for m in player.mates}
+        removed_ids = old_mate_ids - new_mate_ids
+        await _mirror_mates(self._s, player.id, player.mates, removed_ids)
         await self._s.commit()
         return player
 
@@ -289,6 +304,7 @@ class SqlCourtRepository:
         existing.name = court.name
         existing.availability = sorted(court.availability)
         existing.indoor = court.indoor
+        existing.priority = court.priority
         await self._s.commit()
         return court
 
@@ -339,21 +355,24 @@ async def _mirror_mates(
     session: AsyncSession,
     player_id: UUID,
     mates: tuple[PlayerMate, ...],
+    removed_ids: set[str] = frozenset(),
 ) -> None:
     """Spiegelt Mate-Beziehungen symmetrisch in der DB.
 
     Wenn A {B mandatory} hat, sorgt diese Funktion dafür, dass B's mates
-    ebenfalls A enthält (mit demselben mandatory-Flag). mandatory
-    "gewinnt" bei Konflikt. Bestehende Einträge in B's Liste, die A nicht
-    referenzieren, bleiben unangetastet (wir greifen nicht weiter ins
-    fremde Profil ein).
+    ebenfalls A enthält (mit demselben mandatory-Flag; mandatory
+    "gewinnt" bei Konflikt). Wird ein früherer Mate B von A entfernt (in
+    ``removed_ids``), wird A auch aus B's Liste wieder entfernt — sonst
+    bleibt eine einseitige "Geister"-Verbindung stehen, die B fälschlich
+    weiter als ausgewählten Partner von A zeigt.
     """
     wanted: dict[UUID, bool] = {m.player_id: m.mandatory for m in mates}
-    if not wanted:
+    partner_ids = set(wanted.keys()) | {UUID(rid) for rid in removed_ids if rid}
+    if not partner_ids:
         return
     rows = (
         await session.execute(
-            select(PlayerORM).where(PlayerORM.id.in_(list(wanted.keys())))
+            select(PlayerORM).where(PlayerORM.id.in_(list(partner_ids)))
         )
     ).scalars().all()
     for partner in rows:
@@ -363,11 +382,15 @@ async def _mirror_mates(
              if e.get("player_id") == str(player_id)),
             None,
         )
-        new_entry = {"player_id": str(player_id), "mandatory": wanted[partner.id]}
-        if idx is None:
-            existing_list.append(new_entry)
-        else:
-            # mandatory gewinnt: nur upgraden, nie downgraden.
-            if wanted[partner.id]:
-                existing_list[idx] = new_entry
+        if partner.id in wanted:
+            new_entry = {"player_id": str(player_id), "mandatory": wanted[partner.id]}
+            if idx is None:
+                existing_list.append(new_entry)
+            else:
+                # mandatory gewinnt: nur upgraden, nie downgraden.
+                if wanted[partner.id]:
+                    existing_list[idx] = new_entry
+        elif idx is not None:
+            # A hat B entfernt -> B's Rückverweis auf A ebenfalls entfernen.
+            del existing_list[idx]
         partner.mates = existing_list
